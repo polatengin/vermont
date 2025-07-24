@@ -11,15 +11,17 @@ type Logger struct {
 }
 
 // New creates a new logger instance
-func New(debug bool) *Logger {
+func New(verbose bool) *Logger {
 	var config zap.Config
 
-	if debug {
+	if verbose {
+		// Verbose mode: show DEBUG and above
 		config = zap.NewDevelopmentConfig()
 		config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	} else {
+		// Non-verbose mode: show WARN and above (hide INFO and DEBUG)
 		config = zap.NewProductionConfig()
-		config.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+		config.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
 	}
 
 	// Use console encoder for better readability

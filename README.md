@@ -35,10 +35,13 @@ go build -o bin/vermont ./cmd/runner
 # Run a workflow file (executes real commands)
 ./bin/vermont run examples/simple-test.yml
 
+# Run with verbose logging (shows detailed INFO and DEBUG logs)
+./bin/vermont run examples/simple-test.yml --verbose
+
 # Run with development mode (no compilation needed)
 make dev-run FILE=examples/simple-test.yml
 
-# Output example:
+# Output example (clean mode):
 # Executing workflow: Simple Test
 # Job: hello
 #   Steps: 4
@@ -55,8 +58,8 @@ make dev-run FILE=examples/simple-test.yml
 # Validate a workflow
 ./bin/vermont validate examples/simple-test.yml
 
-# Validate with verbose output
-./bin/vermont validate examples/ci-pipeline.yml -v
+# Validate with verbose logging
+./bin/vermont validate examples/ci-pipeline.yml --verbose
 ```
 
 ## Configuration

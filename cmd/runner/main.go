@@ -74,7 +74,7 @@ func newValidateCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 
 	return cmd
 }
@@ -128,7 +128,8 @@ func validateWorkflow(filename string, verbose bool) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	log.Info("✓ Workflow is valid", "name", wf.Name, "jobs", len(wf.Jobs))
+	// Always show validation success (not subject to verbose flag)
+	fmt.Printf("✅ Workflow is valid: %s (%d jobs)\n", wf.Name, len(wf.Jobs))
 
 	if verbose {
 		for jobID, job := range wf.Jobs {
