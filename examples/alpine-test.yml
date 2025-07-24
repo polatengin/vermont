@@ -1,0 +1,19 @@
+name: Alpine Container Test
+on: push
+
+jobs:
+  alpine-test:
+    runs-on: alpine-latest
+    steps:
+      - name: Test Alpine environment
+        run: |
+          echo "Testing Alpine Linux container"
+          cat /etc/os-release | head -3
+          which apk
+          
+      - name: Install and use package
+        run: |
+          apk update --quiet
+          apk add --quiet curl
+          echo "Curl installed successfully"
+          curl --version | head -1

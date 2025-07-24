@@ -1,0 +1,18 @@
+name: Container Error Test
+on: push
+
+jobs:
+  container-error-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Successful step
+        run: echo "This will work"
+        
+      - name: Failing step
+        run: |
+          echo "This will run first"
+          exit 1
+          echo "This will not run"
+          
+      - name: Should not run
+        run: echo "This should not execute"
