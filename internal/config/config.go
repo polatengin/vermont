@@ -99,8 +99,9 @@ type ActionsConfig struct {
 
 // Default returns a default configuration
 func Default() *Config {
-	homeDir, _ := os.UserHomeDir()
-	dataDir := filepath.Join(homeDir, ".vermont")
+	// Use current directory instead of home directory
+	currentDir, _ := os.Getwd()
+	dataDir := filepath.Join(currentDir, ".vermont")
 
 	return &Config{
 		Runner: RunnerConfig{

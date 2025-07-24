@@ -85,9 +85,9 @@ Example configuration:
     "defaultImage": "ubuntu:22.04"
   },
   "storage": {
-    "dataDir": "~/.vermont",
-    "cacheDir": "~/.vermont/cache",
-    "logsDir": "~/.vermont/logs"
+    "dataDir": "./.vermont",
+    "cacheDir": "./.vermont/cache",
+    "logsDir": "./.vermont/logs"
   },
   "logging": {
     "level": "info",
@@ -214,7 +214,7 @@ Vermont now supports GitHub Actions marketplace actions with the following capab
 
 1. **Action Discovery and Caching**
    - Automatic downloading of actions from GitHub repositories
-   - Intelligent caching system to avoid re-downloading (`~/.vermont/cache/actions/`)
+   - Intelligent caching system to avoid re-downloading (`./.vermont/cache/actions/`)
    - Support for versioned actions (e.g., `actions/checkout@v4`)
    - Local action support (`./path/to/action`)
    - Version-specific caching with automatic cache directory creation
@@ -288,7 +288,7 @@ Configuration options:
    - Template processing is isolated and testable
 
 2. **Caching Strategy**
-   - Version-specific caching: `~/.vermont/cache/actions/{owner}/{name}/{version}`
+   - Version-specific caching: `./.vermont/cache/actions/{owner}/{name}/{version}`
    - Automatic cache directory creation
    - Git history removal to save space
    - Cache hit detection prevents unnecessary downloads

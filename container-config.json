@@ -12,9 +12,9 @@
     "defaultImage": "ubuntu:22.04"
   },
   "storage": {
-    "dataDir": "~/.vermont",
-    "cacheDir": "~/.vermont/cache",
-    "logsDir": "~/.vermont/logs"
+    "dataDir": "./.vermont",
+    "cacheDir": "./.vermont/cache",
+    "logsDir": "./.vermont/logs"
   },
   "logging": {
     "level": "debug",
