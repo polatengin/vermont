@@ -1,0 +1,50 @@
+# Logs
+*.log
+/logs/
+
+# Build artifacts
+bin/
+dist/
+releases/
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Go vendor directory
+vendor/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Runtime directories
+tmp/
+.vermont/
+
+# Configuration files (keep examples)
+config.json
+vermont.json
+!examples/
+
+# Docker
+.dockerignore
+
+# Node modules (if any)
+node_modules/
+
+# Backup files
+*.bak
+*.backup
