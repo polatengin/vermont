@@ -245,7 +245,7 @@ func (m *Manager) getShellForImage(image string) string {
 	if strings.Contains(image, "alpine") {
 		return "sh"
 	}
-	
+
 	// Most other images have bash
 	return "bash"
 }
