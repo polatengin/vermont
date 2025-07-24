@@ -1,0 +1,43 @@
+name: 'Hello Composite Action'
+description: 'A simple composite action that greets someone'
+author: 'Vermont Runner'
+
+inputs:
+  name:
+    description: 'The name to greet'
+    required: true
+    default: 'World'
+  greeting:
+    description: 'The greeting to use'
+    required: false
+    default: 'Hello'
+
+outputs:
+  message:
+    description: 'The greeting message'
+    value: ${{ steps.greet.outputs.message }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create greeting
+      id: greet
+      run: |
+        MESSAGE="${{ inputs.greeting }}, ${{ inputs.name }}!"
+        echo "Creating greeting: $MESSAGE"
+        echo "message=$MESSAGE" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Display greeting
+      run: |
+        echo "🎉 ${{ steps.greet.outputs.message }}"
+        echo "This is a composite action running in Vermont!"
+      shell: bash
+
+    - name: Show environment info
+      run: |
+        echo "Action executed at: $(date)"
+        echo "Working directory: $(pwd)"
+        echo "Runner OS: $RUNNER_OS"
+        echo "Runner Architecture: $RUNNER_ARCH"
+      shell: bash

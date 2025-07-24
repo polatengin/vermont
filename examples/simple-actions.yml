@@ -1,0 +1,39 @@
+name: Simple Actions Test
+on: [push]
+
+jobs:
+  basic-actions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simple checkout
+        uses: actions/checkout@v4
+
+      - name: Show checkout result
+        run: |
+          echo "Repository checked out successfully"
+          echo "Current directory contents:"
+          ls -la
+
+      - name: Use local composite action
+        uses: ./examples/actions/hello-composite
+        with:
+          name: "Vermont User"
+          greeting: "Welcome"
+
+  cache-example:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache example
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/example
+          key: example-cache-${{ hashFiles('**/*.md') }}
+
+      - name: Create cache content
+        run: |
+          mkdir -p ~/.cache/example
+          echo "Cached at $(date)" > ~/.cache/example/timestamp.txt
+          cat ~/.cache/example/timestamp.txt

@@ -10,6 +10,7 @@ import (
 
 	"github.com/polatengin/vermont/internal/config"
 	"github.com/polatengin/vermont/internal/logger"
+	"github.com/polatengin/vermont/pkg/actions"
 	"github.com/polatengin/vermont/pkg/container"
 	"github.com/polatengin/vermont/pkg/workflow"
 )
@@ -35,14 +36,21 @@ type Executor struct {
 	config           *config.Config
 	logger           *logger.Logger
 	containerManager *container.Manager
+	actionManager    *actions.Manager
+	actionExecutor   *actions.Executor
 }
 
 // New creates a new executor
 func New(cfg *config.Config, log *logger.Logger) *Executor {
+	actionManager := actions.NewManager(cfg, log)
+	actionExecutor := actions.NewExecutor(actionManager, log)
+	
 	return &Executor{
 		config:           cfg,
 		logger:           log,
 		containerManager: container.NewManager(cfg, log),
+		actionManager:    actionManager,
+		actionExecutor:   actionExecutor,
 	}
 }
 
@@ -102,8 +110,49 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 
 		if step.Uses != "" {
 			fmt.Printf("      Uses: %s\n", step.Uses)
-			// TODO: Implement action execution
-			e.logger.Warn("Action execution not yet implemented", "action", step.Uses)
+			
+			// Convert step.With to map[string]interface{}
+			inputs := make(map[string]interface{})
+			for k, v := range step.With {
+				inputs[k] = v
+			}
+
+			// Execute the action
+			start := time.Now()
+			result, err := e.actionExecutor.Execute(ctx, step.Uses, inputs, jobEnv)
+			duration := time.Since(start)
+
+			if err != nil {
+				e.logger.Error("Action execution failed",
+					"job", jobID,
+					"step", stepNum,
+					"action", step.Uses,
+					"error", err)
+				return fmt.Errorf("step %d (action %s) failed: %v", stepNum, step.Uses, err)
+			}
+
+			if !result.Success {
+				e.logger.Error("Action returned failure",
+					"job", jobID,
+					"step", stepNum,
+					"action", step.Uses,
+					"error", result.Error)
+				return fmt.Errorf("step %d (action %s) failed: %s", stepNum, step.Uses, result.Error)
+			}
+
+			// Show action outputs if any
+			if len(result.Outputs) > 0 {
+				fmt.Printf("      Outputs:\n")
+				for key, value := range result.Outputs {
+					fmt.Printf("        %s: %s\n", key, value)
+				}
+			}
+
+			e.logger.Info("Action completed",
+				"job", jobID,
+				"step", stepNum,
+				"action", step.Uses,
+				"duration", duration)
 			continue
 		}
 

@@ -20,5 +20,12 @@
     "level": "info",
     "format": "console",
     "file": ""
+  },
+  "actions": {
+    "registry": "https://github.com",
+    "cacheEnabled": true,
+    "cacheTtl": 24,
+    "allowedOrgs": [],
+    "nodejsVersion": "20"
   }
 }

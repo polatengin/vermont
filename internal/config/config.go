@@ -20,6 +20,9 @@ type Config struct {
 
 	// Logging configuration
 	Logging LoggingConfig `json:"logging"`
+
+	// Actions configuration
+	Actions ActionsConfig `json:"actions"`
 }
 
 // RunnerConfig contains runner-specific settings
@@ -76,6 +79,24 @@ type LoggingConfig struct {
 	File string `json:"file"`
 }
 
+// ActionsConfig contains GitHub Actions settings
+type ActionsConfig struct {
+	// Registry is the base URL for the actions registry
+	Registry string `json:"registry"`
+
+	// CacheEnabled enables action caching
+	CacheEnabled bool `json:"cacheEnabled"`
+
+	// CacheTTL is the cache time-to-live in hours (0 = no expiration)
+	CacheTTL int `json:"cacheTtl"`
+
+	// AllowedOrgs is a list of allowed GitHub organizations (empty = all)
+	AllowedOrgs []string `json:"allowedOrgs,omitempty"`
+
+	// NodejsVersion is the default Node.js version for node actions
+	NodejsVersion string `json:"nodejsVersion"`
+}
+
 // Default returns a default configuration
 func Default() *Config {
 	homeDir, _ := os.UserHomeDir()
@@ -103,6 +124,13 @@ func Default() *Config {
 			Level:  "info",
 			Format: "console",
 			File:   "",
+		},
+		Actions: ActionsConfig{
+			Registry:      "https://github.com",
+			CacheEnabled:  true,
+			CacheTTL:      24, // 24 hours
+			AllowedOrgs:   []string{}, // Empty = allow all
+			NodejsVersion: "20",
 		},
 	}
 }

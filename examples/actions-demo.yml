@@ -1,0 +1,63 @@
+name: Actions Demo
+on: [push]
+
+jobs:
+  checkout-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: List files after checkout
+        run: |
+          echo "Files in current directory:"
+          ls -la
+          echo "Git status:"
+          git status || echo "Not a git repository"
+
+  setup-tools-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Verify Go installation
+        run: |
+          go version
+          go env GOROOT
+          go env GOPATH
+
+  composite-action-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Local composite action
+        uses: ./examples/actions/hello-composite
+        with:
+          name: Vermont
+          greeting: Hello
+
+      - name: Show result
+        run: echo "Composite action completed"
