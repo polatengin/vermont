@@ -135,7 +135,7 @@ func (a *Action) GetCachePath(cacheDir string) string {
 	}
 
 	// For remote actions: cache/{owner}/{name}/{version}
-	return filepath.Join(cacheDir, "actions", a.Owner, a.Name, a.Version)
+	return filepath.Join(cacheDir, a.Owner, a.Name, a.Version)
 }
 
 // IsLocal returns true if this is a local action
@@ -189,7 +189,8 @@ func (m *Manager) GetAction(ctx context.Context, reference string) (*Action, err
 	}
 
 	// For remote actions, check cache first
-	cachePath := action.GetCachePath(m.config.Storage.CacheDir)
+	actionsCacheDir := filepath.Join(m.config.Storage.CacheDir, "actions")
+	cachePath := action.GetCachePath(actionsCacheDir)
 	action.LocalPath = cachePath
 
 	// Check if action is already cached

@@ -37,3 +37,6 @@ jobs:
           mkdir -p ~/.cache/example
           echo "Cached at $(date)" > ~/.cache/example/timestamp.txt
           cat ~/.cache/example/timestamp.txt
+
+      - name: Super-linter
+        uses: super-linter/super-linter@v8.0.0
