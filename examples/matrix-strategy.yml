@@ -1,0 +1,18 @@
+name: Matrix with Strategy Options
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        lang: [go, node, python]
+        version: [18, 19, 20]
+    steps:
+      - name: Setup ${{ matrix.lang }} ${{ matrix.version }}
+        run: echo "Setting up ${{ matrix.lang }} version ${{ matrix.version }}"
+        
+      - name: Run tests
+        run: echo "Running tests for ${{ matrix.lang }} ${{ matrix.version }}"

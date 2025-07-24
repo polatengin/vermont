@@ -99,6 +99,11 @@ func (p *Parser) Parse(data []byte) (*Workflow, error) {
 		return nil, fmt.Errorf("workflow validation failed: %w", err)
 	}
 
+	// Expand matrix jobs
+	if err := workflow.ExpandMatrixJobs(); err != nil {
+		return nil, fmt.Errorf("matrix expansion failed: %w", err)
+	}
+
 	return &workflow, nil
 }
 
