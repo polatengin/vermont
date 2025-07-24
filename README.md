@@ -366,19 +366,19 @@ jobs:
 
 ```bash
 # Execute workflow with real command execution (host mode)
-make dev-exec ARGS="run examples/simple-test.yml -c host-config.json"
+make dev-exec ARGS="run examples/simple-test.yml -c example-configs/host-config.json"
 
 # Execute workflow with GitHub Actions
-make dev-exec ARGS="run examples/simple-actions.yml -c host-config.json"
+make dev-exec ARGS="run examples/simple-actions.yml -c example-configs/host-config.json"
 
 # Test actions demo with marketplace actions
-make dev-exec ARGS="run examples/actions-demo.yml -c host-config.json"
+make dev-exec ARGS="run examples/actions-demo.yml -c example-configs/host-config.json"
 
 # Execute workflow in containers
-make dev-exec ARGS="run examples/container-test.yml -c container-config.json"
+make dev-exec ARGS="run examples/container-test.yml -c example-configs/container-config.json"
 
 # Test different container images
-make dev-exec ARGS="run examples/alpine-test.yml -c container-config.json"
+make dev-exec ARGS="run examples/alpine-test.yml -c example-configs/container-config.json"
 
 # Test error handling
 make dev-run FILE=examples/error-test.yml
