@@ -10,6 +10,7 @@ import (
 
 	"github.com/polatengin/vermont/internal/config"
 	"github.com/polatengin/vermont/internal/logger"
+	"github.com/polatengin/vermont/pkg/container"
 	"github.com/polatengin/vermont/pkg/workflow"
 )
 
@@ -31,15 +32,17 @@ type JobResult struct {
 
 // Executor handles workflow execution
 type Executor struct {
-	config *config.Config
-	logger *logger.Logger
+	config           *config.Config
+	logger           *logger.Logger
+	containerManager *container.Manager
 }
 
 // New creates a new executor
 func New(cfg *config.Config, log *logger.Logger) *Executor {
 	return &Executor{
-		config: cfg,
-		logger: log,
+		config:           cfg,
+		logger:           log,
+		containerManager: container.NewManager(cfg, log),
 	}
 }
 
@@ -70,6 +73,24 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 	// Set up job environment
 	jobEnv := e.createJobEnvironment(jobID, job)
 
+	// Determine if we should use containers
+	useContainer := e.shouldUseContainer(job)
+	if useContainer {
+		// Check if Docker is available
+		if !e.containerManager.IsDockerAvailable(ctx) {
+			e.logger.Warn("Docker not available, falling back to host execution")
+			useContainer = false
+		}
+	}
+
+	var containerImage string
+	if useContainer {
+		containerImage = e.containerManager.GetDefaultImage(job.GetRunsOn())
+		fmt.Printf("  Container: %s\n", containerImage)
+	} else {
+		fmt.Printf("  Execution: Host\n")
+	}
+
 	// Execute steps
 	for i, step := range job.Steps {
 		stepNum := i + 1
@@ -87,7 +108,31 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 		}
 
 		if step.Run != "" {
-			result := e.executeStep(ctx, step, jobEnv)
+			var result StepResult
+
+			if useContainer {
+				// Execute in container
+				containerResult, containerErr := e.containerManager.RunStep(ctx, step, containerImage, jobEnv, e.config.Runner.WorkDir)
+				if containerErr != nil {
+					e.logger.Error("Container step execution failed",
+						"job", jobID,
+						"step", stepNum,
+						"error", containerErr)
+					return fmt.Errorf("step %d failed: %v", stepNum, containerErr)
+				}
+				
+				// Convert container result to step result
+				result = StepResult{
+					Success:  containerResult.Success,
+					Output:   containerResult.Output,
+					Error:    containerResult.Error,
+					Duration: containerResult.Duration,
+				}
+			} else {
+				// Execute on host
+				result = e.executeStep(ctx, step, jobEnv)
+			}
+
 			if !result.Success {
 				e.logger.Error("Step execution failed",
 					"job", jobID,
@@ -104,7 +149,8 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 			e.logger.Info("Step completed",
 				"job", jobID,
 				"step", stepNum,
-				"duration", result.Duration)
+				"duration", result.Duration,
+				"container", useContainer)
 		}
 	}
 
@@ -198,4 +244,16 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	}
 
 	return env
+}
+
+// shouldUseContainer determines if a job should run in a container
+func (e *Executor) shouldUseContainer(job *workflow.Job) bool {
+	// Check configuration setting
+	if e.config.Container.Runtime == "" || e.config.Container.Runtime == "none" {
+		return false
+	}
+	
+	// For now, use container execution if Docker is configured
+	// In the future, this could be more sophisticated based on job requirements
+	return e.config.Container.Runtime == "docker"
 }

@@ -9,7 +9,7 @@ A lightweight, self-hosted GitHub Actions runner clone written in Go.
 - ✅ **Environment variables** - Job and step level support
 - ✅ **Error handling** - Proper failure detection and workflow termination
 - ✅ **Multi-line scripts** - Complex bash script support
-- 🔄 Container execution support
+- ✅ **Container execution support** - Docker-based step execution
 - 🔄 GitHub Actions compatibility (uses/actions)
 - 🔄 Job dependency management and parallel execution
 - 🔄 Matrix builds support
@@ -127,7 +127,6 @@ Vermont is a single binary application with two main commands:
 - `pkg/workflow` - YAML parsing and validation
 - `pkg/executor` - Job and step execution
 - `pkg/container` - Container management
-- `pkg/actions` - Action registry
 
 ## Step Execution Engine
 
@@ -158,6 +157,12 @@ The Vermont step execution engine is now fully functional with the following cap
    - Clean step-by-step execution display
    - Structured logging with execution times
 
+5. **Container Execution Support**
+   - Docker-based step execution
+   - Automatic image pulling and management
+   - Shell detection (bash for Ubuntu, sh for Alpine)
+   - Host vs container execution based on configuration
+
 #### 🧪 **Testing Completed**
 
 - ✅ Basic command execution (`examples/simple-test.yml`)
@@ -166,6 +171,10 @@ The Vermont step execution engine is now fully functional with the following cap
 - ✅ Multi-command scripts with proper chaining
 - ✅ File creation and manipulation commands
 - ✅ Integration with existing validation and configuration
+- ✅ **Container execution** (`examples/container-test.yml`)
+- ✅ **Alpine Linux support** (`examples/alpine-test.yml`)
+- ✅ **Container error handling** (`examples/container-error-test.yml`)
+- ✅ **Host vs container mode switching** via configuration
 
 #### 📊 **Performance**
 
@@ -177,8 +186,14 @@ The Vermont step execution engine is now fully functional with the following cap
 #### 📝 **Example Usage**
 
 ```bash
-# Execute workflow with real command execution
-make dev-run FILE=examples/simple-test.yml
+# Execute workflow with real command execution (host mode)
+make dev-exec ARGS="run examples/simple-test.yml -c host-config.json"
+
+# Execute workflow in containers
+make dev-exec ARGS="run examples/container-test.yml -c container-config.json"
+
+# Test different container images
+make dev-exec ARGS="run examples/alpine-test.yml -c container-config.json"
 
 # Test error handling
 make dev-run FILE=examples/error-test.yml
@@ -243,16 +258,17 @@ See [design.md](design.md) for detailed architecture and implementation plans.
 - [x] Workflow parsing
 - [x] Configuration management
 - [x] Step execution engine
-- [ ] Container integration
+- [x] Container integration
 
 ### Phase 2
-- [ ] Action registry
-- [ ] Job scheduler
-- [ ] Web interface
-- [ ] Matrix builds
+- [ ] GitHub Actions marketplace integration (uses/actions)
+- [ ] Action registry and caching
+- [ ] Job scheduler and parallel execution
+- [ ] Matrix builds support
 
 ### Phase 3
 - [ ] Artifact management
 - [ ] Secret management
-- [ ] Webhook support
+- [ ] Webhook integration
+- [ ] Web interface and REST API
 - [ ] Performance optimization
