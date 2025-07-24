@@ -9,7 +9,7 @@
     "runtime": "docker",
     "dockerHost": "unix:///var/run/docker.sock",
     "networkMode": "bridge",
-    "defaultImage": "ubuntu:22.04"
+    "defaultImage": "ghcr.io/actions/runner-images/ubuntu-22.04:latest"
   },
   "storage": {
     "dataDir": "./.vermont",

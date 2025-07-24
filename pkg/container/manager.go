@@ -216,10 +216,9 @@ func (m *Manager) GetDefaultImage(runsOn []string) string {
 
 	// Map GitHub Actions runner labels to container images
 	imageMap := map[string]string{
-		"ubuntu-latest": "ubuntu:22.04",
-		"ubuntu-22.04":  "ubuntu:22.04",
-		"ubuntu-20.04":  "ubuntu:20.04",
-		"ubuntu-18.04":  "ubuntu:18.04",
+		"ubuntu-latest": "ghcr.io/actions/runner-images/ubuntu-22.04:latest",
+		"ubuntu-22.04":  "ghcr.io/actions/runner-images/ubuntu-22.04:latest",
+		"ubuntu-20.04":  "ghcr.io/actions/runner-images/ubuntu-20.04:latest",
 		"debian-latest": "debian:12",
 		"debian-12":     "debian:12",
 		"debian-11":     "debian:11",
