@@ -14,7 +14,7 @@ LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DAT
 BIN_DIR = bin
 CMD_DIR = cmd
 
-.PHONY: all build build-verbose clean test lint fmt vet deps dev-deps help docker-test dev-run dev-validate dev-exec
+.PHONY: all build build-verbose clean install uninstall test lint fmt vet deps dev-deps help docker-test dev-run dev-validate dev-exec
 
 # Default target
 all: build
@@ -53,6 +53,31 @@ clean:
 	@echo "Cleaning..."
 	rm -rf $(BIN_DIR)
 	go clean -cache
+
+# Install to system
+install: clean build-runner
+	@echo "Installing Vermont to system..."
+	@if [ "$(shell id -u)" != "0" ]; then \
+		echo "Installing to /usr/local/bin (may require sudo)..."; \
+		sudo install -m 755 $(BIN_DIR)/vermont /usr/local/bin/vermont; \
+	else \
+		echo "Installing to /usr/local/bin..."; \
+		install -m 755 $(BIN_DIR)/vermont /usr/local/bin/vermont; \
+	fi
+	@echo "Vermont installed successfully!"
+	@echo "You can now run 'vermont --version' from anywhere."
+
+# Uninstall from system
+uninstall:
+	@echo "Uninstalling Vermont from system..."
+	@if [ "$(shell id -u)" != "0" ]; then \
+		echo "Removing from /usr/local/bin (may require sudo)..."; \
+		sudo rm -f /usr/local/bin/vermont; \
+	else \
+		echo "Removing from /usr/local/bin..."; \
+		rm -f /usr/local/bin/vermont; \
+	fi
+	@echo "Vermont uninstalled successfully!"
 
 # Run tests
 test:
@@ -170,6 +195,8 @@ help:
 	@echo "  build-verbose  Build the binary with verbose output"
 	@echo "  build-runner   Build runner binary"
 	@echo "  clean          Clean build artifacts"
+	@echo "  install        Clean, build, and install Vermont to system (/usr/local/bin)"
+	@echo "  uninstall      Remove Vermont from system"
 	@echo "  test           Run tests with coverage"
 	@echo "  lint           Run linter"
 	@echo "  fmt            Format code"
