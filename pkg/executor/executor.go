@@ -89,21 +89,21 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 		if step.Run != "" {
 			result := e.executeStep(ctx, step, jobEnv)
 			if !result.Success {
-				e.logger.Error("Step execution failed", 
-					"job", jobID, 
-					"step", stepNum, 
+				e.logger.Error("Step execution failed",
+					"job", jobID,
+					"step", stepNum,
 					"error", result.Error)
 				return fmt.Errorf("step %d failed: %s", stepNum, result.Error)
 			}
-			
+
 			// Show step output if there's any
 			if strings.TrimSpace(result.Output) != "" {
 				fmt.Printf("      Output: %s", result.Output)
 			}
-			
-			e.logger.Info("Step completed", 
-				"job", jobID, 
-				"step", stepNum, 
+
+			e.logger.Info("Step completed",
+				"job", jobID,
+				"step", stepNum,
 				"duration", result.Duration)
 		}
 	}
@@ -115,42 +115,42 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 // executeStep executes a single step
 func (e *Executor) executeStep(ctx context.Context, step *workflow.Step, env map[string]string) StepResult {
 	start := time.Now()
-	
+
 	// Parse the command
 	commands := strings.Split(strings.TrimSpace(step.Run), "\n")
-	
+
 	var output strings.Builder
-	
+
 	for _, command := range commands {
 		command = strings.TrimSpace(command)
 		if command == "" {
 			continue
 		}
-		
+
 		// Execute the command
 		cmd := exec.CommandContext(ctx, "bash", "-c", command)
-		
+
 		// Set environment variables
 		cmd.Env = os.Environ()
 		for key, value := range env {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 		}
-		
+
 		// Set environment variables from step
 		for key, value := range step.Env {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 		}
-		
+
 		// Execute command
 		out, err := cmd.CombinedOutput()
 		output.WriteString(string(out))
-		
+
 		if err != nil {
-			e.logger.Error("Command execution failed", 
-				"command", command, 
+			e.logger.Error("Command execution failed",
+				"command", command,
 				"error", err,
 				"output", string(out))
-			
+
 			return StepResult{
 				Success:  false,
 				Output:   output.String(),
@@ -158,12 +158,12 @@ func (e *Executor) executeStep(ctx context.Context, step *workflow.Step, env map
 				Duration: time.Since(start),
 			}
 		}
-		
-		e.logger.Debug("Command executed", 
-			"command", command, 
+
+		e.logger.Debug("Command executed",
+			"command", command,
 			"output", string(out))
 	}
-	
+
 	return StepResult{
 		Success:  true,
 		Output:   output.String(),
@@ -175,7 +175,7 @@ func (e *Executor) executeStep(ctx context.Context, step *workflow.Step, env map
 // createJobEnvironment creates environment variables for a job
 func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[string]string {
 	env := make(map[string]string)
-	
+
 	// Default GitHub Actions environment variables
 	env["GITHUB_WORKFLOW"] = jobID
 	env["GITHUB_JOB"] = jobID
@@ -191,11 +191,11 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	env["RUNNER_ARCH"] = "X64"
 	env["RUNNER_NAME"] = "Vermont Runner"
 	env["RUNNER_TOOL_CACHE"] = "/opt/hostedtoolcache"
-	
+
 	// Add job-specific environment variables
 	for key, value := range job.Env {
 		env[key] = value
 	}
-	
+
 	return env
 }
