@@ -23,7 +23,7 @@ all: build
 build: build-runner
 
 # Build the binary with verbose output
-build-verbose: 
+build-verbose:
 	@echo "Building Vermont..."
 	@echo "Version: $(VERSION)"
 	@echo "Commit: $(COMMIT)"
