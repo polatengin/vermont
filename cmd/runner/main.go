@@ -31,7 +31,8 @@ func newRootCommand() *cobra.Command {
 		Short: "Vermont - Lightweight GitHub Actions Runner Clone",
 		Long: `Vermont is a lightweight, self-hosted GitHub Actions runner clone written in Go.
 It executes YAML workflows with support for basic GitHub Actions features.`,
-		Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+		Version:       fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+		SilenceErrors: true, // We handle errors in main()
 	}
 
 	// Add subcommands
@@ -46,10 +47,11 @@ func newRunCommand() *cobra.Command {
 	var verbose bool
 
 	cmd := &cobra.Command{
-		Use:   "run [workflow.yml]",
-		Short: "Run a workflow file",
-		Long:  "Execute a GitHub Actions workflow file",
-		Args:  cobra.ExactArgs(1),
+		Use:          "run [workflow.yml]",
+		Short:        "Run a workflow file",
+		Long:         "Execute a GitHub Actions workflow file",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true, // Don't show usage on errors
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runWorkflow(args[0], configFile, verbose)
 		},
@@ -65,10 +67,11 @@ func newValidateCommand() *cobra.Command {
 	var verbose bool
 
 	cmd := &cobra.Command{
-		Use:   "validate [workflow.yml]",
-		Short: "Validate a workflow file",
-		Long:  "Validate the syntax and structure of a GitHub Actions workflow file",
-		Args:  cobra.ExactArgs(1),
+		Use:          "validate [workflow.yml]",
+		Short:        "Validate a workflow file",
+		Long:         "Validate the syntax and structure of a GitHub Actions workflow file",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true, // Don't show usage on errors
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return validateWorkflow(args[0], verbose)
 		},
