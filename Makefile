@@ -14,7 +14,7 @@ LDFLAGS = -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DAT
 BIN_DIR = bin
 CMD_DIR = cmd
 
-.PHONY: all build build-verbose clean test lint fmt vet deps dev-deps help docker-test
+.PHONY: all build build-verbose clean test lint fmt vet deps dev-deps help docker-test dev-run dev-validate dev-exec
 
 # Default target
 all: build
@@ -149,6 +149,18 @@ dev-server: build-runner
 	@echo "Starting development runner..."
 	./$(BIN_DIR)/vermont run examples/simple-test.yml
 
+# Run directly with go run (no compilation needed)
+dev-run:
+	@go run ./$(CMD_DIR)/runner run $(or $(FILE),examples/simple-test.yml)
+
+# Validate directly with go run
+dev-validate:
+	@go run ./$(CMD_DIR)/runner validate $(or $(FILE),examples/simple-test.yml)
+
+# Run any command with go run (accepts ARGS parameter)
+dev-exec:
+	@go run ./$(CMD_DIR)/runner $(ARGS)
+
 # Help
 help:
 	@echo "Vermont Makefile"
@@ -169,5 +181,8 @@ help:
 	@echo "  release        Create release archives"
 	@echo "  docker-build   Build Docker image"
 	@echo "  docker-test    Test Docker image with dynamic commands"
-	@echo "  dev-server     Run development test"
+	@echo "  dev-server     Run development test (compiled)"
+	@echo "  dev-run        Run with go run (FILE=path/to/workflow.yml, defaults to examples/simple-test.yml)"
+	@echo "  dev-validate   Validate with go run (FILE=path/to/workflow.yml, defaults to examples/simple-test.yml)"
+	@echo "  dev-exec       Execute any command with go run (use ARGS=...)"
 	@echo "  help           Show this help"
