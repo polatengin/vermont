@@ -102,7 +102,7 @@ func runWorkflow(workflowFile, configFile string, verbose bool) error {
 
 	// Execute workflow
 	log.Info("Executing workflow", "file", workflowFile)
-	
+
 	wf, err := parser.ParseFile(workflowFile)
 	if err != nil {
 		return fmt.Errorf("failed to parse workflow: %w", err)
