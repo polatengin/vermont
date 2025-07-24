@@ -1,0 +1,52 @@
+name: Test GitHub Actions Runner Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check tools availability
+        run: |
+          echo "=== Checking available tools ==="
+          echo "Git version:"
+          git --version
+          
+          echo "Go version:"
+          go version
+          
+          echo "Node.js version:"
+          node --version
+          
+          echo "NPM version:"
+          npm --version
+          
+          echo ".NET version:"
+          dotnet --version
+          
+          echo "Make version:"
+          make --version
+          
+          echo "Python version:"
+          python3 --version
+          
+          echo "Docker version:"
+          docker --version
+          
+          echo "GitHub CLI version:"
+          gh --version
+
+      - name: Test build with make
+        run: |
+          echo "=== Testing make build ==="
+          # Check if we can access the Makefile
+          ls -la Makefile
+          echo "Running make build..."
+          make build
+          echo "Build completed successfully!"
+          
+          # Check the built binary
+          ls -la bin/
+          ./bin/vermont --version
