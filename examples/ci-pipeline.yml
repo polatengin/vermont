@@ -10,24 +10,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-          
+
       - name: Cache Go modules
         uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          
+
       - name: Download dependencies
         run: go mod download
-        
+
       - name: Run tests
         run: go test -v ./...
-        
+
       - name: Run linter
         run: golangci-lint run
 
@@ -37,18 +37,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-          
+
       - name: Build application
         run: |
-          go build -o bin/vermont-runner ./cmd/runner
-          go build -o bin/vermont-server ./cmd/server
-          go build -o bin/vermont-cli ./cmd/cli
-          
+          go build -o bin/vermont ./cmd/runner
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -62,11 +60,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Build Docker image
         run: |
-          docker build -t vermont:latest .
-          
-      - name: Push to registry
-        run: |
+          echo "Docker build would happen here"
+          echo "Image: vermont:latest"
           echo "Would push to registry here"
