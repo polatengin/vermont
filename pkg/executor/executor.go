@@ -39,10 +39,6 @@ func (e *Executor) Execute(ctx context.Context, wf *workflow.Workflow) error {
 				fmt.Printf("    Step %d\n", i+1)
 			}
 
-			if step.Run != "" {
-				fmt.Printf("      Run: %s\n", step.Run)
-			}
-
 			if step.Uses != "" {
 				fmt.Printf("      Uses: %s\n", step.Uses)
 			}
