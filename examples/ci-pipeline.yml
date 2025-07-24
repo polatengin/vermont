@@ -1,0 +1,72 @@
+name: CI Pipeline
+on: [push, pull_request]
+
+env:
+  GO_VERSION: "1.21"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          
+      - name: Download dependencies
+        run: go mod download
+        
+      - name: Run tests
+        run: go test -v ./...
+        
+      - name: Run linter
+        run: golangci-lint run
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Build application
+        run: |
+          go build -o bin/vermont-runner ./cmd/runner
+          go build -o bin/vermont-server ./cmd/server
+          go build -o bin/vermont-cli ./cmd/cli
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: bin/
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Build Docker image
+        run: |
+          docker build -t vermont:latest .
+          
+      - name: Push to registry
+        run: |
+          echo "Would push to registry here"

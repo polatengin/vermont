@@ -1,0 +1,21 @@
+name: Simple Test
+on: push
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello World
+        run: echo "Hello, World!"
+        
+      - name: Show environment
+        run: |
+          echo "Runner OS: $RUNNER_OS"
+          echo "GitHub Actor: $GITHUB_ACTOR"
+          echo "Working Directory: $(pwd)"
+          
+      - name: Create file
+        run: echo "Vermont Runner Test" > test.txt
+        
+      - name: Show file content
+        run: cat test.txt
