@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/polatengin/vermont/internal/config"
@@ -29,6 +30,38 @@ type JobResult struct {
 	Steps       []StepResult
 	Duration    time.Duration
 	Environment map[string]string
+	Outputs     map[string]string
+}
+
+// JobState represents the state of a job
+type JobState struct {
+	ID           string
+	Job          *workflow.Job
+	Status       JobStatus
+	Result       *JobResult
+	Dependencies []string
+	StartTime    time.Time
+	EndTime      time.Time
+}
+
+// JobStatus represents the execution status of a job
+type JobStatus int
+
+const (
+	JobStatusPending JobStatus = iota
+	JobStatusReady
+	JobStatusRunning
+	JobStatusCompleted
+	JobStatusFailed
+	JobStatusSkipped
+)
+
+// JobScheduler manages job execution with dependency handling
+type JobScheduler struct {
+	executor      *Executor
+	jobs          map[string]*JobState
+	completedJobs map[string]bool
+	mutex         sync.RWMutex
 }
 
 // Executor handles workflow execution
@@ -54,20 +87,232 @@ func New(cfg *config.Config, log *logger.Logger) *Executor {
 	}
 }
 
-// Execute executes a workflow
+// Execute executes a workflow with dependency management and parallel execution
 func (e *Executor) Execute(ctx context.Context, wf *workflow.Workflow) error {
 	e.logger.Info("Executing workflow", "name", wf.Name)
 	fmt.Printf("Executing workflow: %s\n", wf.Name)
 
-	// Execute jobs (for now, sequentially - TODO: handle dependencies)
+	// Create and run job scheduler
+	scheduler := NewJobScheduler(e)
+	return scheduler.ExecuteWorkflow(ctx, wf)
+}
+
+// NewJobScheduler creates a new job scheduler
+func NewJobScheduler(executor *Executor) *JobScheduler {
+	return &JobScheduler{
+		executor:      executor,
+		jobs:          make(map[string]*JobState),
+		completedJobs: make(map[string]bool),
+	}
+}
+
+// ExecuteWorkflow executes all jobs in a workflow with dependency management
+func (s *JobScheduler) ExecuteWorkflow(ctx context.Context, wf *workflow.Workflow) error {
+	// Initialize job states
+	s.initializeJobs(wf)
+
+	// Validate dependencies
+	if err := s.validateDependencies(); err != nil {
+		return fmt.Errorf("dependency validation failed: %w", err)
+	}
+
+	// Execute jobs
+	return s.executeJobs(ctx)
+}
+
+// initializeJobs creates JobState for each job
+func (s *JobScheduler) initializeJobs(wf *workflow.Workflow) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	for jobID, job := range wf.Jobs {
-		if err := e.executeJob(ctx, jobID, job); err != nil {
-			e.logger.Error("Job execution failed", "job", jobID, "error", err)
-			return fmt.Errorf("job %s failed: %w", jobID, err)
+		s.jobs[jobID] = &JobState{
+			ID:           jobID,
+			Job:          job,
+			Status:       JobStatusPending,
+			Dependencies: job.GetDependencies(),
+		}
+	}
+}
+
+// validateDependencies checks for circular dependencies and missing jobs
+func (s *JobScheduler) validateDependencies() error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	// Check for missing dependencies
+	for jobID, jobState := range s.jobs {
+		for _, depID := range jobState.Dependencies {
+			if _, exists := s.jobs[depID]; !exists {
+				return fmt.Errorf("job '%s' depends on non-existent job '%s'", jobID, depID)
+			}
 		}
 	}
 
-	e.logger.Info("Workflow execution completed", "name", wf.Name)
+	// Check for circular dependencies using DFS
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
+
+	for jobID := range s.jobs {
+		if !visited[jobID] {
+			if s.hasCycle(jobID, visited, recStack) {
+				return fmt.Errorf("circular dependency detected involving job '%s'", jobID)
+			}
+		}
+	}
+
+	return nil
+}
+
+// hasCycle performs DFS to detect circular dependencies
+func (s *JobScheduler) hasCycle(jobID string, visited, recStack map[string]bool) bool {
+	visited[jobID] = true
+	recStack[jobID] = true
+
+	jobState := s.jobs[jobID]
+	for _, depID := range jobState.Dependencies {
+		if !visited[depID] {
+			if s.hasCycle(depID, visited, recStack) {
+				return true
+			}
+		} else if recStack[depID] {
+			return true
+		}
+	}
+
+	recStack[jobID] = false
+	return false
+}
+
+// executeJobs executes jobs with dependency management and parallel execution
+func (s *JobScheduler) executeJobs(ctx context.Context) error {
+	var wg sync.WaitGroup
+	errorChan := make(chan error, len(s.jobs))
+	maxConcurrent := s.executor.config.Runner.MaxConcurrentJobs
+	semaphore := make(chan struct{}, maxConcurrent)
+
+	// Continue until all jobs are completed or failed
+	for len(s.completedJobs) < len(s.jobs) {
+		readyJobs := s.getReadyJobs()
+		if len(readyJobs) == 0 {
+			// Check if we're in a deadlock (no ready jobs but not all completed)
+			if len(s.completedJobs) < len(s.jobs) {
+				pendingJobs := s.getPendingJobs()
+				if len(pendingJobs) > 0 {
+					return fmt.Errorf("workflow deadlock detected: no ready jobs but %d jobs still pending", len(pendingJobs))
+				}
+			}
+			break
+		}
+
+		// Start ready jobs
+		for _, jobState := range readyJobs {
+			wg.Add(1)
+			go func(js *JobState) {
+				defer wg.Done()
+
+				// Acquire semaphore
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				// Execute job
+				err := s.executeJob(ctx, js)
+				if err != nil {
+					errorChan <- err
+				}
+			}(jobState)
+		}
+
+		// Wait for current batch to complete
+		wg.Wait()
+
+		// Check for errors
+		select {
+		case err := <-errorChan:
+			return err
+		default:
+		}
+
+		// Small delay to prevent busy waiting
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	s.executor.logger.Info("Workflow execution completed", "totalJobs", len(s.jobs), "completedJobs", len(s.completedJobs))
+	return nil
+}
+
+// getReadyJobs returns jobs that are ready to execute
+func (s *JobScheduler) getReadyJobs() []*JobState {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var ready []*JobState
+	for _, jobState := range s.jobs {
+		if jobState.Status == JobStatusPending && s.areDependenciesMet(jobState) {
+			jobState.Status = JobStatusReady
+			ready = append(ready, jobState)
+		}
+	}
+	return ready
+}
+
+// getPendingJobs returns jobs that are still pending
+func (s *JobScheduler) getPendingJobs() []*JobState {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	var pending []*JobState
+	for _, jobState := range s.jobs {
+		if jobState.Status == JobStatusPending {
+			pending = append(pending, jobState)
+		}
+	}
+	return pending
+}
+
+// areDependenciesMet checks if all dependencies for a job are completed successfully
+func (s *JobScheduler) areDependenciesMet(jobState *JobState) bool {
+	for _, depID := range jobState.Dependencies {
+		if !s.completedJobs[depID] {
+			return false
+		}
+
+		// Check if dependency succeeded
+		if depState, exists := s.jobs[depID]; exists {
+			if depState.Status == JobStatusFailed {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// executeJob executes a single job and updates its state
+func (s *JobScheduler) executeJob(ctx context.Context, jobState *JobState) error {
+	s.mutex.Lock()
+	jobState.Status = JobStatusRunning
+	jobState.StartTime = time.Now()
+	s.mutex.Unlock()
+
+	s.executor.logger.Info("Starting job", "job", jobState.ID, "dependencies", jobState.Dependencies)
+
+	// Execute the job using the existing executeJob method
+	err := s.executor.executeJob(ctx, jobState.ID, jobState.Job)
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	jobState.EndTime = time.Now()
+	if err != nil {
+		jobState.Status = JobStatusFailed
+		s.executor.logger.Error("Job failed", "job", jobState.ID, "error", err, "duration", jobState.EndTime.Sub(jobState.StartTime))
+		return fmt.Errorf("job %s failed: %w", jobState.ID, err)
+	} else {
+		jobState.Status = JobStatusCompleted
+		s.completedJobs[jobState.ID] = true
+		s.executor.logger.Info("Job completed", "job", jobState.ID, "duration", jobState.EndTime.Sub(jobState.StartTime))
+	}
+
 	return nil
 }
 
@@ -75,6 +320,13 @@ func (e *Executor) Execute(ctx context.Context, wf *workflow.Workflow) error {
 func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.Job) error {
 	e.logger.Info("Starting job", "job", jobID)
 	fmt.Printf("Job: %s\n", jobID)
+
+	// Show dependencies if any
+	dependencies := job.GetDependencies()
+	if len(dependencies) > 0 {
+		fmt.Printf("  Needs: %v\n", dependencies)
+	}
+
 	fmt.Printf("  Runs on: %v\n", job.GetRunsOn())
 	fmt.Printf("  Steps: %d\n", len(job.Steps))
 

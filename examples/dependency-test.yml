@@ -1,0 +1,59 @@
+name: Dependency Test
+on: [push]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Initialize
+        run: |
+          echo "Setting up environment"
+          echo "Setup completed successfully"
+
+  test-unit:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Unit tests
+        run: |
+          echo "Running unit tests"
+          sleep 2
+          echo "Unit tests completed"
+
+  test-integration:
+    runs-on: ubuntu-latest  
+    needs: setup
+    steps:
+      - name: Integration tests
+        run: |
+          echo "Running integration tests"
+          sleep 3
+          echo "Integration tests completed"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-integration]
+    steps:
+      - name: Build application
+        run: |
+          echo "Building application"
+          sleep 1
+          echo "Build completed"
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging"
+          echo "Deployment completed"
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production"
+          echo "Production deployment completed"

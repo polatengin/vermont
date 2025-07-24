@@ -202,3 +202,26 @@ func (job *Job) GetRunsOn() []string {
 		return []string{"ubuntu-latest"}
 	}
 }
+
+// GetDependencies returns the dependencies for this job
+func (job *Job) GetDependencies() []string {
+	if job.Needs == nil {
+		return nil
+	}
+
+	var deps []string
+	switch needs := job.Needs.(type) {
+	case string:
+		deps = []string{needs}
+	case []interface{}:
+		for _, dep := range needs {
+			if depStr, ok := dep.(string); ok {
+				deps = append(deps, depStr)
+			}
+		}
+	case []string:
+		deps = needs
+	}
+
+	return deps
+}
