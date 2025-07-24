@@ -1,0 +1,18 @@
+name: Error Test
+on: push
+
+jobs:
+  test-failure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Successful step
+        run: echo "This will work"
+        
+      - name: Failing step
+        run: |
+          echo "This will run first"
+          false
+          echo "This will not run"
+          
+      - name: Should not run
+        run: echo "This should not execute"
