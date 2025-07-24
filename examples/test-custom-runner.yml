@@ -1,0 +1,28 @@
+name: Test Custom GitHub Actions Runner Image
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check tools availability
+        run: |
+          echo "=== Checking available tools ==="
+          echo "Git version:"
+          git --version
+          echo "Go version:"
+          go version
+          echo "Node.js version:"
+          node --version
+          echo "NPM version:"
+          npm --version
+          echo ".NET version:"
+          dotnet --version
+          echo "Make version:"
+          make --version
+          echo "Python version:"
+          python3 --version
+          echo "Docker version:"
+          docker --version
+          echo "GitHub CLI version:"
+          gh --version
