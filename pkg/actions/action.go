@@ -135,20 +135,20 @@ func (a *Action) GetCachePath(cacheDir string) string {
 	}
 
 	// For remote actions with sub-actions (e.g., github/codeql-action/init@v1):
-	// - Repository: github/codeql-action  
+	// - Repository: github/codeql-action
 	// - Sub-action: init
 	// - Cache path: cache/github/codeql-action/v1/init
 	nameParts := strings.Split(a.Name, "/")
 	repoName := nameParts[0]
-	
+
 	basePath := filepath.Join(cacheDir, a.Owner, repoName, a.Version)
-	
+
 	if len(nameParts) > 1 {
 		// Sub-action path
 		subAction := strings.Join(nameParts[1:], "/")
 		return filepath.Join(basePath, subAction)
 	}
-	
+
 	return basePath
 }
 
@@ -162,7 +162,7 @@ func (a *Action) GetRepositoryURL() string {
 	if a.IsLocal() {
 		return ""
 	}
-	
+
 	// For sub-actions like github/codeql-action/init, we want just github/codeql-action
 	repoName := strings.Split(a.Name, "/")[0]
 	return fmt.Sprintf("https://github.com/%s/%s", a.Owner, repoName)
@@ -208,12 +208,12 @@ func (m *Manager) GetAction(ctx context.Context, reference string) (*Action, err
 	// For remote actions, check cache first
 	actionsCacheDir := filepath.Join(m.config.Storage.CacheDir, "actions")
 	cachePath := action.GetCachePath(actionsCacheDir)
-	
+
 	// For sub-actions, we need to clone the base repository first
 	nameParts := strings.Split(action.Name, "/")
 	repoName := nameParts[0]
 	baseRepoPath := filepath.Join(actionsCacheDir, action.Owner, repoName, action.Version)
-	
+
 	action.LocalPath = cachePath
 
 	// Check if action is already cached
@@ -316,7 +316,7 @@ func (m *Manager) gitCloneWithCommand(ctx context.Context, repoURL, version, loc
 	// Check if version looks like a commit SHA (40 hex chars)
 	isCommitSHA := m.isCommitSHA(version)
 	m.logger.Info("Git clone analysis", "version", version, "isCommitSHA", isCommitSHA)
-	
+
 	if isCommitSHA {
 		// For commit SHAs, we need to clone the full repository (not shallow)
 		m.logger.Info("Detected commit SHA, cloning full repository", "version", version)
