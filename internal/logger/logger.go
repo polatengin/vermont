@@ -49,7 +49,7 @@ func New(verbose bool) *Logger {
 // WithFields returns a logger with additional fields
 func (l *Logger) WithFields(fields ...interface{}) *Logger {
 	return &Logger{
-		SugaredLogger: l.SugaredLogger.With(fields...),
+		SugaredLogger: l.With(fields...),
 	}
 }
 

@@ -186,7 +186,9 @@ func (e *Executor) executeCompositeAction(ctx context.Context, action *Action, e
 
 	// Create temporary directory for GITHUB_OUTPUT
 	tmpDir := "/tmp/vermont-action-" + strings.ReplaceAll(action.Reference, "/", "-")
-	os.MkdirAll(tmpDir, 0755)
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
+	}
 	githubOutputFile := filepath.Join(tmpDir, "github_output")
 
 	// Add GITHUB_OUTPUT to environment
@@ -234,7 +236,9 @@ func (e *Executor) executeCompositeAction(ctx context.Context, action *Action, e
 	}
 
 	// Clean up
-	os.RemoveAll(tmpDir)
+	if err := os.RemoveAll(tmpDir); err != nil {
+		e.logger.Warn("Failed to remove temporary directory", "path", tmpDir, "error", err)
+	}
 
 	return &ActionExecutionResult{
 		Success: true,

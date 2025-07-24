@@ -298,7 +298,7 @@ func (m *Manager) isCommitSHA(version string) bool {
 	// Check if it's 40 characters long and contains only hexadecimal characters
 	if len(version) == 40 {
 		for _, c := range version {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 				return false
 			}
 		}
@@ -311,7 +311,11 @@ func (m *Manager) isCommitSHA(version string) bool {
 func (m *Manager) gitCloneWithCommand(ctx context.Context, repoURL, version, localPath string) error {
 	// Create temporary directory for cloning
 	tempDir := localPath + ".tmp"
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			m.logger.Warn("Failed to remove temporary directory", "path", tempDir, "error", err)
+		}
+	}()
 
 	// Check if version looks like a commit SHA (40 hex chars)
 	isCommitSHA := m.isCommitSHA(version)
