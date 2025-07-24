@@ -1,0 +1,116 @@
+# GitHub Actions-compatible CentOS 8 Runner Image
+# Based on the official actions/runner-images scripts
+# Note: CentOS 8 is EOL, using CentOS Stream 8 as alternative
+FROM quay.io/centos/centos:stream8
+
+# Set working directory
+WORKDIR /workspace
+
+# Update package lists and install essential packages first
+RUN dnf update -y && \
+    dnf install -y \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg2 \
+        git \
+        git-lfs \
+        jq \
+        sudo \
+        python3 \
+        python3-pip \
+        gcc \
+        gcc-c++ \
+        make \
+        which \
+        tar \
+        gzip \
+        unzip \
+        openssl-devel
+
+# Create runner user after sudo is installed
+RUN useradd -m -s /bin/bash runner && \
+    usermod -aG wheel runner && \
+    echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install Go
+RUN curl -fsSL https://golang.org/dl/go1.23.11.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/runner/.bashrc
+
+# Install Node.js via NodeSource repository
+RUN curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && \
+    dnf install -y nodejs
+
+# Install .NET SDK
+RUN dnf install -y dotnet-sdk-8.0
+
+# Install GitHub CLI
+RUN dnf install -y 'dnf-command(config-manager)' && \
+    dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+    dnf install -y gh
+
+# Install Docker
+RUN dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Install additional development tools
+RUN dnf install -y \
+        cmake \
+        autoconf \
+        automake \
+        libtool \
+        clang \
+        llvm \
+        zip \
+        unzip \
+        p7zip \
+        rsync \
+        openssh-clients \
+        vim \
+        nano \
+        htop \
+        tree \
+        file \
+        wget \
+        curl \
+        nmap-ncat \
+        telnet \
+        iputils \
+        bind-utils \
+        net-tools
+
+# Install Python packages commonly used in CI
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    python3 -m pip install \
+        requests \
+        pyyaml \
+        jinja2 \
+        ansible \
+        pytest \
+        flake8 \
+        black \
+        mypy
+
+# Clean up package cache
+RUN dnf clean all && \
+    rm -rf /var/cache/dnf /tmp/* /var/tmp/*
+
+# Set environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/home/runner/go"
+ENV GOBIN="/home/runner/go/bin"
+
+# Create directories
+RUN mkdir -p /home/runner/go/bin && \
+    chown -R runner:runner /home/runner && \
+    chown -R runner:runner /workspace
+
+# Switch to runner user
+USER runner
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Default command
+CMD ["/bin/bash"]

@@ -129,7 +129,7 @@ func (m *Manager) RunStep(ctx context.Context, step *workflow.Step, image string
 	}, nil
 }
 
-// PullImage pulls a container image
+// PullImage pulls a container image or builds it if it's a Vermont runner image
 func (m *Manager) PullImage(ctx context.Context, image string) error {
 	// Check if image already exists locally
 	checkCmd := exec.CommandContext(ctx, "docker", "image", "inspect", image)
@@ -137,6 +137,11 @@ func (m *Manager) PullImage(ctx context.Context, image string) error {
 		// Image exists locally
 		m.logger.Debug("Image already exists locally", "image", image)
 		return nil
+	}
+
+	// Check if this is a Vermont runner image that needs to be built locally
+	if strings.HasPrefix(image, "vermont-runner:") {
+		return m.buildVermontRunnerImage(ctx, image)
 	}
 
 	m.logger.Info("Pulling container image", "image", image)
@@ -195,6 +200,66 @@ func (m *Manager) Cleanup(ctx context.Context) error {
 	return nil
 }
 
+// buildVermontRunnerImage builds a Vermont runner image locally
+func (m *Manager) buildVermontRunnerImage(ctx context.Context, image string) error {
+	// Extract the tag from the image name (e.g., "vermont-runner:ubuntu-latest" -> "ubuntu-latest")
+	parts := strings.Split(image, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid image format: %s", image)
+	}
+	tag := parts[1]
+
+	// Map tag to dockerfile
+	dockerfileMap := map[string]string{
+		"ubuntu-latest": "runners/Dockerfile.ubuntu-latest",
+		"ubuntu-22.04":  "runners/Dockerfile.ubuntu-22.04",
+		"ubuntu-20.04":  "runners/Dockerfile.ubuntu-20.04",
+		"debian-latest": "runners/Dockerfile.debian-latest",
+		"debian-12":     "runners/Dockerfile.debian-12",
+		"debian-11":     "runners/Dockerfile.debian-11",
+		"alpine-latest": "runners/Dockerfile.alpine-latest",
+		"centos-latest": "runners/Dockerfile.centos-latest",
+		"centos-8":      "runners/Dockerfile.centos-8",
+		"centos-7":      "runners/Dockerfile.centos-7",
+	}
+
+	dockerfilePath, exists := dockerfileMap[tag]
+	if !exists {
+		return fmt.Errorf("no dockerfile found for Vermont runner image: %s", image)
+	}
+
+	m.logger.Info("Building Vermont runner image", "image", image, "dockerfile", dockerfilePath)
+
+	// Build the image
+	cmd := exec.CommandContext(ctx, "docker", "build", "-f", dockerfilePath, "-t", image, ".")
+
+	// Stream the output to show build progress
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start docker build: %w", err)
+	}
+
+	// Read output in real-time
+	go m.streamOutput(stdout, "BUILD")
+	go m.streamOutput(stderr, "BUILD-ERR")
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to build image %s: %w", image, err)
+	}
+
+	m.logger.Info("Vermont runner image built successfully", "image", image)
+	return nil
+}
+
 // IsDockerAvailable checks if Docker is available
 func (m *Manager) IsDockerAvailable(ctx context.Context) bool {
 	cmd := exec.CommandContext(ctx, "docker", "version")
@@ -216,17 +281,17 @@ func (m *Manager) GetDefaultImage(runsOn []string) string {
 
 	// Map GitHub Actions runner labels to container images
 	imageMap := map[string]string{
-		"ubuntu-latest": "vermont-runner:latest",
-		"ubuntu-22.04":  "vermont-runner:22.04",
-		"ubuntu-20.04":  "catthehacker/ubuntu:act-20.04",
-		"debian-latest": "debian:12",
-		"debian-12":     "debian:12",
-		"debian-11":     "debian:11",
-		"alpine-latest": "alpine:latest",
-		"alpine":        "alpine:latest",
-		"centos-latest": "centos:8",
-		"centos-8":      "centos:8",
-		"centos-7":      "centos:7",
+		"ubuntu-latest": "vermont-runner:ubuntu-latest",
+		"ubuntu-22.04":  "vermont-runner:ubuntu-22.04",
+		"ubuntu-20.04":  "vermont-runner:ubuntu-20.04",
+		"debian-latest": "vermont-runner:debian-latest",
+		"debian-12":     "vermont-runner:debian-12",
+		"debian-11":     "vermont-runner:debian-11",
+		"alpine-latest": "vermont-runner:alpine-latest",
+		"alpine":        "vermont-runner:alpine-latest",
+		"centos-latest": "vermont-runner:centos-latest",
+		"centos-8":      "vermont-runner:centos-8",
+		"centos-7":      "vermont-runner:centos-7",
 	}
 
 	for _, runner := range runsOn {

@@ -9,7 +9,7 @@
     "runtime": "docker",
     "dockerHost": "unix:///var/run/docker.sock",
     "networkMode": "bridge",
-    "defaultImage": "catthehacker/ubuntu:act-latest"
+    "defaultImage": "vermont-runner:latest"
   },
   "storage": {
     "dataDir": "./.vermont",

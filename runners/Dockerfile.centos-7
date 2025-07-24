@@ -1,0 +1,116 @@
+# GitHub Actions-compatible CentOS 7 Runner Image
+# Based on the official actions/runner-images scripts
+# Note: CentOS 7 is EOL, but still widely used
+FROM centos:7
+
+# Set working directory
+WORKDIR /workspace
+
+# Update package lists and install essential packages first
+RUN yum update -y && \
+    yum install -y \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg2 \
+        git \
+        jq \
+        sudo \
+        python3 \
+        python3-pip \
+        gcc \
+        gcc-c++ \
+        make \
+        which \
+        tar \
+        gzip \
+        unzip \
+        openssl-devel \
+        centos-release-scl
+
+# Install newer git version
+RUN yum install -y rh-git218 && \
+    echo 'source /opt/rh/rh-git218/enable' >> /etc/profile && \
+    echo 'source /opt/rh/rh-git218/enable' >> /home/runner/.bashrc
+
+# Create runner user after sudo is installed
+RUN useradd -m -s /bin/bash runner && \
+    usermod -aG wheel runner && \
+    echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install Go
+RUN curl -fsSL https://golang.org/dl/go1.23.11.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/runner/.bashrc
+
+# Install Node.js via NodeSource repository
+RUN curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && \
+    yum install -y nodejs
+
+# Install GitHub CLI (manual installation for CentOS 7)
+RUN curl -fsSL https://github.com/cli/cli/releases/download/v2.40.1/gh_2.40.1_linux_amd64.tar.gz | \
+    tar -C /usr/local -xzf - --strip-components=1
+
+# Install Docker (CentOS 7 version)
+RUN yum install -y yum-utils && \
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
+    yum install -y docker-ce docker-ce-cli containerd.io
+
+# Install additional development tools
+RUN yum install -y \
+        cmake3 \
+        autoconf \
+        automake \
+        libtool \
+        zip \
+        unzip \
+        p7zip \
+        rsync \
+        openssh-clients \
+        vim \
+        nano \
+        htop \
+        tree \
+        file \
+        wget \
+        curl \
+        nmap-ncat \
+        telnet \
+        iputils \
+        bind-utils \
+        net-tools
+
+# Install Python packages commonly used in CI
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    python3 -m pip install \
+        requests \
+        pyyaml \
+        jinja2 \
+        ansible \
+        pytest \
+        flake8 \
+        black \
+        mypy
+
+# Clean up package cache
+RUN yum clean all && \
+    rm -rf /var/cache/yum /tmp/* /var/tmp/*
+
+# Set environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/home/runner/go"
+ENV GOBIN="/home/runner/go/bin"
+
+# Create directories
+RUN mkdir -p /home/runner/go/bin && \
+    chown -R runner:runner /home/runner && \
+    chown -R runner:runner /workspace
+
+# Switch to runner user
+USER runner
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Default command
+CMD ["/bin/bash"]

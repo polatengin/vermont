@@ -1,0 +1,107 @@
+# GitHub Actions-compatible Alpine Latest Runner Image
+# Based on the official actions/runner-images scripts
+FROM alpine:latest
+
+# Set working directory
+WORKDIR /workspace
+
+# Install essential packages first
+RUN apk update && \
+    apk add --no-cache \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg \
+        git \
+        git-lfs \
+        jq \
+        sudo \
+        python3 \
+        py3-pip \
+        build-base \
+        linux-headers \
+        openssl-dev \
+        bash \
+        shadow
+
+# Create runner user after sudo is installed
+RUN adduser -D -s /bin/bash runner && \
+    addgroup runner wheel && \
+    echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Install Go
+RUN curl -fsSL https://golang.org/dl/go1.23.11.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/runner/.bashrc
+
+# Install Node.js (Alpine uses different approach)
+RUN apk add --no-cache nodejs npm
+
+# Install GitHub CLI (via apk in Alpine)
+RUN apk add --no-cache github-cli
+
+# Install Docker
+RUN apk add --no-cache docker docker-compose
+
+# Install additional development tools
+RUN apk add --no-cache \
+        make \
+        cmake \
+        autoconf \
+        automake \
+        libtool \
+        gcc \
+        g++ \
+        clang \
+        llvm \
+        zip \
+        unzip \
+        tar \
+        gzip \
+        rsync \
+        openssh-client \
+        vim \
+        nano \
+        htop \
+        tree \
+        file \
+        wget \
+        curl \
+        netcat-openbsd \
+        busybox-extras \
+        iputils
+
+# Install Python packages commonly used in CI
+RUN python3 -m pip install --upgrade pip setuptools wheel --break-system-packages && \
+    python3 -m pip install \
+        requests \
+        pyyaml \
+        jinja2 \
+        ansible \
+        pytest \
+        flake8 \
+        black \
+        mypy \
+        --break-system-packages
+
+# Clean up package cache
+RUN rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
+
+# Set environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/home/runner/go"
+ENV GOBIN="/home/runner/go/bin"
+
+# Create directories
+RUN mkdir -p /home/runner/go/bin && \
+    chown -R runner:runner /home/runner && \
+    chown -R runner:runner /workspace
+
+# Switch to runner user
+USER runner
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Default command
+CMD ["/bin/bash"]

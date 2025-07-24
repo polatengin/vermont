@@ -601,6 +601,165 @@ go test ./...
 ./bin/vermont run examples/simple-test.yml
 ```
 
+## Runner Images
+
+Vermont includes GitHub Actions-compatible runner images for consistent CI/CD environments across different operating systems.
+
+### Available Images
+
+#### Ubuntu Images
+- **`ubuntu-latest`** - Ubuntu 22.04 LTS with comprehensive toolset (default)
+- **`ubuntu-22.04`** - Ubuntu 22.04 LTS (Jammy Jellyfish)
+- **`ubuntu-20.04`** - Ubuntu 20.04 LTS (Focal Fossa)
+
+#### Debian Images
+- **`debian-latest`** - Debian 12 (Bookworm) with comprehensive toolset
+- **`debian-12`** - Debian 12 (Bookworm)
+- **`debian-11`** - Debian 11 (Bullseye)
+
+#### Alpine Images
+- **`alpine-latest`** - Alpine Linux latest with lightweight toolset
+
+#### CentOS Images
+- **`centos-latest`** - CentOS Stream 9 with comprehensive toolset
+- **`centos-8`** - CentOS Stream 8 (CentOS 8 EOL replacement)
+- **`centos-7`** - CentOS 7 (legacy support)
+
+### Included Tools
+
+All runner images include:
+
+#### Core Development Tools
+- **Go** 1.23.11 - Latest Go compiler and runtime
+- **Node.js** v20.x - JavaScript runtime with npm
+- **Python** 3.x - Python interpreter with pip
+- **.NET** 8.0 SDK - .NET development kit
+- **Git** - Version control with git-lfs support
+- **Docker** - Container runtime and CLI tools
+
+#### GitHub Integration
+- **GitHub CLI** (`gh`) - Official GitHub command-line tool
+- **Git LFS** - Large file support for Git repositories
+
+#### Build & CI Tools
+- **make**, **cmake** - Build automation tools
+- **gcc**, **g++**, **clang** - C/C++ compilers
+- **autoconf**, **automake**, **libtool** - Build configuration tools
+- **jq** - JSON processor for CI scripts
+
+#### Development Utilities
+- **vim**, **nano** - Text editors
+- **htop**, **tree** - System monitoring and file navigation
+- **curl**, **wget** - HTTP clients
+- **zip**, **unzip**, **tar**, **gzip** - Archive tools
+- **ssh**, **rsync** - Remote access and sync tools
+- **netcat**, **telnet**, **ping** - Network debugging tools
+
+#### Python Packages
+- **requests** - HTTP library
+- **pyyaml** - YAML parser
+- **jinja2** - Template engine
+- **ansible** - Automation tool
+- **pytest** - Testing framework
+- **flake8**, **black**, **mypy** - Code quality tools
+
+### Building Runner Images
+
+To build a specific runner image:
+
+```bash
+# Build Ubuntu latest runner
+docker build -f runners/Dockerfile.ubuntu-latest -t vermont-runner:ubuntu-latest .
+
+# Build Debian latest runner
+docker build -f runners/Dockerfile.debian-latest -t vermont-runner:debian-latest .
+
+# Build Alpine latest runner
+docker build -f runners/Dockerfile.alpine-latest -t vermont-runner:alpine-latest .
+
+# Build all runner images
+make build-runners
+```
+
+### Usage in Workflows
+
+Vermont automatically maps GitHub Actions runner labels to these images:
+
+```yaml
+name: Multi-OS Test
+on: [push]
+
+jobs:
+  ubuntu-job:
+    runs-on: ubuntu-latest  # Uses vermont-runner:ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on Ubuntu"
+
+  debian-job:
+    runs-on: debian-latest  # Uses vermont-runner:debian-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on Debian"
+
+  alpine-job:
+    runs-on: alpine-latest  # Uses vermont-runner:alpine-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on Alpine"
+
+  centos-job:
+    runs-on: centos-latest  # Uses vermont-runner:centos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Running on CentOS"
+```
+
+### Container Image Mapping
+
+The container manager automatically maps runner labels to images:
+
+| Runner Label | Container Image |
+|--------------|-----------------|
+| `ubuntu-latest` | `vermont-runner:ubuntu-latest` |
+| `ubuntu-22.04` | `vermont-runner:ubuntu-22.04` |
+| `ubuntu-20.04` | `vermont-runner:ubuntu-20.04` |
+| `debian-latest` | `vermont-runner:debian-latest` |
+| `debian-12` | `vermont-runner:debian-12` |
+| `debian-11` | `vermont-runner:debian-11` |
+| `alpine-latest` | `vermont-runner:alpine-latest` |
+| `alpine` | `vermont-runner:alpine-latest` |
+| `centos-latest` | `vermont-runner:centos-latest` |
+| `centos-8` | `vermont-runner:centos-8` |
+| `centos-7` | `vermont-runner:centos-7` |
+
+### Docker Files Location
+
+All runner Dockerfiles are located in the `runners/` directory:
+
+```
+runners/
+├── Dockerfile.ubuntu-latest
+├── Dockerfile.ubuntu-22.04
+├── Dockerfile.ubuntu-20.04
+├── Dockerfile.debian-latest
+├── Dockerfile.debian-12
+├── Dockerfile.debian-11
+├── Dockerfile.alpine-latest
+├── Dockerfile.centos-latest
+├── Dockerfile.centos-8
+└── Dockerfile.centos-7
+```
+
+### Notes
+
+- All images include a `runner` user with sudo privileges
+- Working directory is set to `/workspace`
+- Images are optimized for CI/CD workloads with comprehensive toolsets
+- CentOS 7 and 8 use alternatives due to EOL status
+- Alpine images use `sh` shell by default, others use `bash`
+- Debian 12+ requires `--break-system-packages` for pip installs
+
 ## Contributing
 
 1. Fork the repository

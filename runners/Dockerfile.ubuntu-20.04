@@ -1,0 +1,131 @@
+# GitHub Actions-compatible Ubuntu 20.04 Runner Image
+# Based on the official actions/runner-images scripts
+FROM ubuntu:20.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /workspace
+
+# Update package lists and install essential packages first
+RUN apt-get update && \
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg \
+        lsb-release \
+        software-properties-common \
+        apt-transport-https \
+        build-essential \
+        unzip \
+        tar \
+        gzip \
+        git \
+        git-lfs \
+        jq \
+        sudo \
+        python3 \
+        python3-pip \
+        pkg-config \
+        libssl-dev
+
+# Create runner user after sudo is installed
+RUN useradd -m -s /bin/bash runner && \
+    usermod -aG sudo runner && \
+    echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Install Go
+RUN curl -fsSL https://golang.org/dl/go1.23.11.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/environment && \
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/runner/.bashrc
+
+# Install Node.js via NodeSource repository (like GitHub Actions)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+# Install .NET SDK (Ubuntu 20.04 version)
+RUN wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-8.0
+
+# Install GitHub CLI
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y gh
+
+# Install Docker
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Install additional development tools
+RUN apt-get install -y \
+        make \
+        cmake \
+        autoconf \
+        automake \
+        libtool \
+        gcc \
+        g++ \
+        clang \
+        llvm \
+        zip \
+        unzip \
+        p7zip-full \
+        rsync \
+        ssh \
+        openssh-client \
+        vim \
+        nano \
+        htop \
+        tree \
+        file \
+        wget \
+        curl \
+        netcat \
+        telnet \
+        iputils-ping \
+        dnsutils \
+        net-tools
+
+# Install Python packages commonly used in CI
+RUN python3 -m pip install --upgrade pip setuptools wheel && \
+    python3 -m pip install \
+        requests \
+        pyyaml \
+        jinja2 \
+        ansible \
+        pytest \
+        flake8 \
+        black \
+        mypy
+
+# Clean up package cache
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Set environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/home/runner/go"
+ENV GOBIN="/home/runner/go/bin"
+
+# Create directories
+RUN mkdir -p /home/runner/go/bin && \
+    chown -R runner:runner /home/runner && \
+    chown -R runner:runner /workspace
+
+# Switch to runner user
+USER runner
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Default command
+CMD ["/bin/bash"]

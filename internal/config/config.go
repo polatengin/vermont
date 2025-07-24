@@ -114,7 +114,7 @@ func Default() *Config {
 			Runtime:      "docker",
 			DockerHost:   "unix:///var/run/docker.sock",
 			NetworkMode:  "bridge",
-			DefaultImage: "ubuntu:22.04",
+			DefaultImage: "vermont-runner:latest",
 		},
 		Storage: StorageConfig{
 			DataDir:  dataDir,
