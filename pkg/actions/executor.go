@@ -180,7 +180,7 @@ func (e *Executor) executeCompositeAction(ctx context.Context, action *Action, e
 			inputs[inputName] = v
 		}
 	}
-	
+
 	templateProcessor := NewTemplateProcessor(inputs, env)
 	outputs := make(map[string]string)
 
@@ -188,7 +188,7 @@ func (e *Executor) executeCompositeAction(ctx context.Context, action *Action, e
 	tmpDir := "/tmp/vermont-action-" + strings.ReplaceAll(action.Reference, "/", "-")
 	os.MkdirAll(tmpDir, 0755)
 	githubOutputFile := filepath.Join(tmpDir, "github_output")
-	
+
 	// Add GITHUB_OUTPUT to environment
 	actionEnv := make(map[string]string)
 	for k, v := range env {
@@ -256,7 +256,7 @@ func (e *Executor) executeCompositeStep(ctx context.Context, action *Action, ste
 	if step.Run != "" {
 		// Process template variables in the run command
 		processedCommand := templateProcessor.ProcessTemplate(step.Run)
-		
+
 		// Execute shell command
 		return e.executeShellStep(ctx, action.LocalPath, processedCommand, step.Shell, stepEnv)
 	} else if step.Uses != "" {
@@ -276,20 +276,20 @@ func (e *Executor) executeCompositeStep(ctx context.Context, action *Action, ste
 // executeShellStep executes a shell command step
 func (e *Executor) executeShellStep(ctx context.Context, workingDir, command, shell string, env map[string]string) (*ActionExecutionResult, error) {
 	start := time.Now()
-	
+
 	// Use bash as default shell
 	if shell == "" {
 		shell = "bash"
 	}
 
-	e.logger.Info("Executing shell step", 
-		"command", command, 
-		"shell", shell, 
+	e.logger.Info("Executing shell step",
+		"command", command,
+		"shell", shell,
 		"workingDir", workingDir)
 
 	// Execute the command
 	cmd := exec.CommandContext(ctx, shell, "-c", command)
-	
+
 	// Set working directory
 	if workingDir != "" {
 		cmd.Dir = workingDir
@@ -345,7 +345,7 @@ func (e *Executor) executeNodeAction(ctx context.Context, action *Action, env ma
 	// 1. Check if Node.js is available
 	// 2. Install dependencies (npm install)
 	// 3. Execute the main script
-	
+
 	return &ActionExecutionResult{
 		Success: true,
 		Outputs: map[string]string{
@@ -362,7 +362,7 @@ func (e *Executor) executeDockerAction(ctx context.Context, action *Action, env 
 	// In a real implementation, you would:
 	// 1. Build or pull the Docker image
 	// 2. Run the container with appropriate environment and volumes
-	
+
 	return &ActionExecutionResult{
 		Success: true,
 		Outputs: map[string]string{

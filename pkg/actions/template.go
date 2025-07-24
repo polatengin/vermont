@@ -26,11 +26,11 @@ func NewTemplateProcessor(inputs map[string]interface{}, env map[string]string) 
 func (tp *TemplateProcessor) ProcessTemplate(text string) string {
 	// Process ${{ ... }} expressions
 	re := regexp.MustCompile(`\$\{\{\s*([^}]+)\s*\}\}`)
-	
+
 	return re.ReplaceAllStringFunc(text, func(match string) string {
 		// Extract the expression inside ${{ }}
 		expression := strings.TrimSpace(match[3 : len(match)-2])
-		
+
 		// Process the expression
 		return tp.evaluateExpression(expression)
 	})
@@ -39,7 +39,7 @@ func (tp *TemplateProcessor) ProcessTemplate(text string) string {
 // evaluateExpression evaluates a template expression
 func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 	expr = strings.TrimSpace(expr)
-	
+
 	// Handle inputs.xxx
 	if strings.HasPrefix(expr, "inputs.") {
 		inputName := expr[7:] // Remove "inputs."
@@ -48,7 +48,7 @@ func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 		}
 		return ""
 	}
-	
+
 	// Handle env.xxx
 	if strings.HasPrefix(expr, "env.") {
 		envName := expr[4:] // Remove "env."
@@ -57,7 +57,7 @@ func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 		}
 		return ""
 	}
-	
+
 	// Handle steps.xxx.outputs.xxx
 	if strings.HasPrefix(expr, "steps.") && strings.Contains(expr, ".outputs.") {
 		// Extract step ID and output name
@@ -72,7 +72,7 @@ func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 		}
 		return ""
 	}
-	
+
 	// Handle runner.xxx
 	if strings.HasPrefix(expr, "runner.") {
 		runnerProp := expr[7:] // Remove "runner."
@@ -88,7 +88,7 @@ func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 		}
 		return ""
 	}
-	
+
 	// Handle github.xxx
 	if strings.HasPrefix(expr, "github.") {
 		githubProp := expr[7:] // Remove "github."
@@ -106,13 +106,13 @@ func (tp *TemplateProcessor) evaluateExpression(expr string) string {
 		}
 		return ""
 	}
-	
+
 	// Handle hashFiles() function
 	if strings.HasPrefix(expr, "hashFiles(") && strings.HasSuffix(expr, ")") {
 		// For now, return a simple hash
 		return "abc123hash"
 	}
-	
+
 	// Default: return the expression as-is (or empty for unknown)
 	return fmt.Sprintf("${%s}", expr)
 }

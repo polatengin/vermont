@@ -44,7 +44,7 @@ type Executor struct {
 func New(cfg *config.Config, log *logger.Logger) *Executor {
 	actionManager := actions.NewManager(cfg, log)
 	actionExecutor := actions.NewExecutor(actionManager, log)
-	
+
 	return &Executor{
 		config:           cfg,
 		logger:           log,
@@ -110,7 +110,7 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 
 		if step.Uses != "" {
 			fmt.Printf("      Uses: %s\n", step.Uses)
-			
+
 			// Convert step.With to map[string]interface{}
 			inputs := make(map[string]interface{})
 			for k, v := range step.With {
@@ -169,7 +169,7 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 						"error", containerErr)
 					return fmt.Errorf("step %d failed: %v", stepNum, containerErr)
 				}
-				
+
 				// Convert container result to step result
 				result = StepResult{
 					Success:  containerResult.Success,
@@ -301,7 +301,7 @@ func (e *Executor) shouldUseContainer(job *workflow.Job) bool {
 	if e.config.Container.Runtime == "" || e.config.Container.Runtime == "none" {
 		return false
 	}
-	
+
 	// For now, use container execution if Docker is configured
 	// In the future, this could be more sophisticated based on job requirements
 	return e.config.Container.Runtime == "docker"

@@ -16,28 +16,28 @@ import (
 type Action struct {
 	// Full action reference (e.g., "actions/checkout@v4")
 	Reference string `json:"reference"`
-	
+
 	// Parsed components
 	Owner   string `json:"owner"`   // e.g., "actions"
 	Name    string `json:"name"`    // e.g., "checkout"
 	Version string `json:"version"` // e.g., "v4"
-	
+
 	// Action metadata (from action.yml)
 	Metadata *ActionMetadata `json:"metadata,omitempty"`
-	
+
 	// Local path where action is cached
 	LocalPath string `json:"localPath"`
 }
 
 // ActionMetadata represents action.yml/action.yaml metadata
 type ActionMetadata struct {
-	Name        string                 `yaml:"name"`
-	Description string                 `yaml:"description"`
-	Author      string                 `yaml:"author,omitempty"`
-	Inputs      map[string]ActionInput `yaml:"inputs,omitempty"`
+	Name        string                  `yaml:"name"`
+	Description string                  `yaml:"description"`
+	Author      string                  `yaml:"author,omitempty"`
+	Inputs      map[string]ActionInput  `yaml:"inputs,omitempty"`
 	Outputs     map[string]ActionOutput `yaml:"outputs,omitempty"`
-	Runs        ActionRuns             `yaml:"runs"`
-	Branding    *ActionBranding        `yaml:"branding,omitempty"`
+	Runs        ActionRuns              `yaml:"runs"`
+	Branding    *ActionBranding         `yaml:"branding,omitempty"`
 }
 
 // ActionInput represents an action input
@@ -133,7 +133,7 @@ func (a *Action) GetCachePath(cacheDir string) string {
 	if a.LocalPath != "" {
 		return a.LocalPath
 	}
-	
+
 	// For remote actions: cache/{owner}/{name}/{version}
 	return filepath.Join(cacheDir, "actions", a.Owner, a.Name, a.Version)
 }
@@ -211,21 +211,21 @@ func (m *Manager) isActionCached(cachePath string) bool {
 	// Check if the action directory exists and contains action.yml or action.yaml
 	actionYml := filepath.Join(cachePath, "action.yml")
 	actionYaml := filepath.Join(cachePath, "action.yaml")
-	
+
 	if _, err := os.Stat(actionYml); err == nil {
 		return true
 	}
 	if _, err := os.Stat(actionYaml); err == nil {
 		return true
 	}
-	
+
 	return false
 }
 
 // downloadAction downloads an action from GitHub
 func (m *Manager) downloadAction(ctx context.Context, action *Action) error {
 	m.logger.Info("Downloading action", "action", action.Reference)
-	
+
 	// Create cache directory
 	if err := os.MkdirAll(action.LocalPath, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
@@ -233,7 +233,7 @@ func (m *Manager) downloadAction(ctx context.Context, action *Action) error {
 
 	// Use git to clone the repository at the specified version
 	repoURL := action.GetRepositoryURL()
-	
+
 	// Clone with specific branch/tag
 	// For now, we'll use a simple approach - in production, you might want to use go-git
 	return m.gitCloneAction(ctx, repoURL, action.Version, action.LocalPath)
@@ -252,7 +252,7 @@ func (m *Manager) gitCloneAction(ctx context.Context, repoURL, version, localPat
 	}
 
 	m.logger.Info("Cloning action repository", "url", repoURL, "version", version, "path", localPath)
-	
+
 	// Try to use git command if available
 	if m.isGitAvailable() {
 		return m.gitCloneWithCommand(ctx, repoURL, version, localPath)
@@ -278,9 +278,9 @@ func (m *Manager) gitCloneWithCommand(ctx context.Context, repoURL, version, loc
 	// Clone the repository with specific branch/tag
 	cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", version, repoURL, tempDir)
 	if err := cloneCmd.Run(); err != nil {
-		m.logger.Warn("Failed to clone with specific version, trying default branch", 
+		m.logger.Warn("Failed to clone with specific version, trying default branch",
 			"url", repoURL, "version", version, "error", err)
-		
+
 		// Try cloning without specific version
 		cloneCmd = exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, tempDir)
 		if err := cloneCmd.Run(); err != nil {
@@ -290,7 +290,7 @@ func (m *Manager) gitCloneWithCommand(ctx context.Context, repoURL, version, loc
 		// Try to checkout the specific version
 		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tempDir, "checkout", version)
 		if err := checkoutCmd.Run(); err != nil {
-			m.logger.Warn("Failed to checkout specific version, using default", 
+			m.logger.Warn("Failed to checkout specific version, using default",
 				"version", version, "error", err)
 		}
 	}
@@ -331,7 +331,7 @@ runs:
 	if err := os.MkdirAll(localPath, 0755); err != nil {
 		return fmt.Errorf("failed to create action directory: %w", err)
 	}
-	
+
 	if err := os.WriteFile(actionYmlPath, []byte(placeholderContent), 0644); err != nil {
 		return fmt.Errorf("failed to create placeholder action.yml: %w", err)
 	}

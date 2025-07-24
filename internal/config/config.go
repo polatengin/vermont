@@ -129,7 +129,7 @@ func Default() *Config {
 		Actions: ActionsConfig{
 			Registry:      "https://github.com",
 			CacheEnabled:  true,
-			CacheTTL:      24, // 24 hours
+			CacheTTL:      24,         // 24 hours
 			AllowedOrgs:   []string{}, // Empty = allow all
 			NodejsVersion: "20",
 		},
