@@ -134,8 +134,22 @@ func (a *Action) GetCachePath(cacheDir string) string {
 		return a.LocalPath
 	}
 
-	// For remote actions: cache/{owner}/{name}/{version}
-	return filepath.Join(cacheDir, a.Owner, a.Name, a.Version)
+	// For remote actions with sub-actions (e.g., github/codeql-action/init@v1):
+	// - Repository: github/codeql-action  
+	// - Sub-action: init
+	// - Cache path: cache/github/codeql-action/v1/init
+	nameParts := strings.Split(a.Name, "/")
+	repoName := nameParts[0]
+	
+	basePath := filepath.Join(cacheDir, a.Owner, repoName, a.Version)
+	
+	if len(nameParts) > 1 {
+		// Sub-action path
+		subAction := strings.Join(nameParts[1:], "/")
+		return filepath.Join(basePath, subAction)
+	}
+	
+	return basePath
 }
 
 // IsLocal returns true if this is a local action
@@ -148,7 +162,10 @@ func (a *Action) GetRepositoryURL() string {
 	if a.IsLocal() {
 		return ""
 	}
-	return fmt.Sprintf("https://github.com/%s/%s", a.Owner, a.Name)
+	
+	// For sub-actions like github/codeql-action/init, we want just github/codeql-action
+	repoName := strings.Split(a.Name, "/")[0]
+	return fmt.Sprintf("https://github.com/%s/%s", a.Owner, repoName)
 }
 
 // ActionExecutionResult represents the result of action execution
@@ -191,6 +208,12 @@ func (m *Manager) GetAction(ctx context.Context, reference string) (*Action, err
 	// For remote actions, check cache first
 	actionsCacheDir := filepath.Join(m.config.Storage.CacheDir, "actions")
 	cachePath := action.GetCachePath(actionsCacheDir)
+	
+	// For sub-actions, we need to clone the base repository first
+	nameParts := strings.Split(action.Name, "/")
+	repoName := nameParts[0]
+	baseRepoPath := filepath.Join(actionsCacheDir, action.Owner, repoName, action.Version)
+	
 	action.LocalPath = cachePath
 
 	// Check if action is already cached
@@ -199,8 +222,8 @@ func (m *Manager) GetAction(ctx context.Context, reference string) (*Action, err
 		return action, nil
 	}
 
-	// Download and cache the action
-	if err := m.downloadAction(ctx, action); err != nil {
+	// Download and cache the action - clone to base repo path
+	if err := m.downloadAction(ctx, action, baseRepoPath); err != nil {
 		return nil, fmt.Errorf("failed to download action: %w", err)
 	}
 
@@ -224,11 +247,11 @@ func (m *Manager) isActionCached(cachePath string) bool {
 }
 
 // downloadAction downloads an action from GitHub
-func (m *Manager) downloadAction(ctx context.Context, action *Action) error {
+func (m *Manager) downloadAction(ctx context.Context, action *Action, baseRepoPath string) error {
 	m.logger.Info("Downloading action", "action", action.Reference)
 
 	// Create cache directory
-	if err := os.MkdirAll(action.LocalPath, 0755); err != nil {
+	if err := os.MkdirAll(baseRepoPath, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -237,7 +260,7 @@ func (m *Manager) downloadAction(ctx context.Context, action *Action) error {
 
 	// Clone with specific branch/tag
 	// For now, we'll use a simple approach - in production, you might want to use go-git
-	return m.gitCloneAction(ctx, repoURL, action.Version, action.LocalPath)
+	return m.gitCloneAction(ctx, repoURL, action.Version, baseRepoPath)
 }
 
 // gitCloneAction clones an action repository
@@ -270,29 +293,63 @@ func (m *Manager) isGitAvailable() bool {
 	return err == nil
 }
 
+// isCommitSHA checks if a version string looks like a commit SHA
+func (m *Manager) isCommitSHA(version string) bool {
+	// Check if it's 40 characters long and contains only hexadecimal characters
+	if len(version) == 40 {
+		for _, c := range version {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // gitCloneWithCommand uses git command to clone the repository
 func (m *Manager) gitCloneWithCommand(ctx context.Context, repoURL, version, localPath string) error {
 	// Create temporary directory for cloning
 	tempDir := localPath + ".tmp"
 	defer os.RemoveAll(tempDir)
 
-	// Clone the repository with specific branch/tag
-	cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", version, repoURL, tempDir)
-	if err := cloneCmd.Run(); err != nil {
-		m.logger.Warn("Failed to clone with specific version, trying default branch",
-			"url", repoURL, "version", version, "error", err)
-
-		// Try cloning without specific version
-		cloneCmd = exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, tempDir)
+	// Check if version looks like a commit SHA (40 hex chars)
+	isCommitSHA := m.isCommitSHA(version)
+	m.logger.Info("Git clone analysis", "version", version, "isCommitSHA", isCommitSHA)
+	
+	if isCommitSHA {
+		// For commit SHAs, we need to clone the full repository (not shallow)
+		m.logger.Info("Detected commit SHA, cloning full repository", "version", version)
+		cloneCmd := exec.CommandContext(ctx, "git", "clone", repoURL, tempDir)
 		if err := cloneCmd.Run(); err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 
-		// Try to checkout the specific version
+		// Checkout the specific commit
 		checkoutCmd := exec.CommandContext(ctx, "git", "-C", tempDir, "checkout", version)
 		if err := checkoutCmd.Run(); err != nil {
-			m.logger.Warn("Failed to checkout specific version, using default",
-				"version", version, "error", err)
+			return fmt.Errorf("failed to checkout commit %s: %w", version, err)
+		}
+	} else {
+		// For tags/branches, try shallow clone first
+		m.logger.Info("Detected tag/branch, trying shallow clone", "version", version)
+		cloneCmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", version, repoURL, tempDir)
+		if err := cloneCmd.Run(); err != nil {
+			m.logger.Warn("Failed to clone with specific version, trying default branch",
+				"url", repoURL, "version", version, "error", err)
+
+			// Try cloning without specific version
+			cloneCmd = exec.CommandContext(ctx, "git", "clone", "--depth", "1", repoURL, tempDir)
+			if err := cloneCmd.Run(); err != nil {
+				return fmt.Errorf("failed to clone repository: %w", err)
+			}
+
+			// Try to checkout the specific version
+			checkoutCmd := exec.CommandContext(ctx, "git", "-C", tempDir, "checkout", version)
+			if err := checkoutCmd.Run(); err != nil {
+				m.logger.Warn("Failed to checkout specific version, using default",
+					"version", version, "error", err)
+			}
 		}
 	}
 
