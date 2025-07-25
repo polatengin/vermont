@@ -332,7 +332,7 @@ func (e *Executor) executeShellStep(ctx context.Context, workingDir, command, sh
 	e.logger.Error("Composite actions with shell steps require container implementation",
 		"command", command,
 		"workingDir", workingDir)
-	
+
 	return &ActionExecutionResult{
 		Success: false,
 		Error:   "Composite actions with shell steps are not yet supported in container-only mode",

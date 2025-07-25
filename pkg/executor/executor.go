@@ -340,12 +340,18 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 
 	// Check if Docker is available (required for all execution)
 	if !e.containerManager.IsDockerAvailable(ctx) {
-		return fmt.Errorf("Docker is required but not available. Please install and start Docker")
+		return fmt.Errorf("docker is required but not available. Please install and start Docker")
 	}
 
 	// Always use container execution
 	containerImage := e.containerManager.GetDefaultImage(job.GetRunsOn())
 	fmt.Printf("  Container: %s\n", containerImage)
+
+	// Create unique workspace directory for this job
+	jobWorkDir := fmt.Sprintf("%s-%s", e.config.Runner.WorkDir, jobID)
+	if err := os.MkdirAll(jobWorkDir, 0755); err != nil {
+		return fmt.Errorf("failed to create job workspace directory: %w", err)
+	}
 
 	// Execute steps
 	for i, step := range job.Steps {
@@ -380,7 +386,7 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 			}
 			containerEnv["_VERMONT_CONTAINER_MODE"] = "true"
 			containerEnv["_VERMONT_CONTAINER_IMAGE"] = containerImage
-			containerEnv["_VERMONT_WORK_DIR"] = e.config.Runner.WorkDir
+			containerEnv["_VERMONT_WORK_DIR"] = jobWorkDir
 
 			result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, containerEnv)
 
@@ -424,7 +430,7 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 			var result StepResult
 
 			// Execute in container (always)
-			containerResult, containerErr := e.containerManager.RunStep(ctx, step, containerImage, jobEnv, e.config.Runner.WorkDir)
+			containerResult, containerErr := e.containerManager.RunStep(ctx, step, containerImage, jobEnv, jobWorkDir)
 			if containerErr != nil {
 				e.logger.Error("Container step execution failed",
 					"job", jobID,
@@ -584,4 +590,3 @@ func (e *Executor) ensureWorkDirectory() {
 
 	e.logger.Debug("Work directory ensured", "dir", workDir)
 }
-
