@@ -150,7 +150,7 @@ func (e *Executor) createActionEnvironment(action *Action, inputs map[string]int
 	// Add action-specific environment variables
 	env["GITHUB_ACTION"] = action.Reference
 	env["GITHUB_ACTION_PATH"] = action.LocalPath
-	
+
 	// Add standard GitHub Actions environment variables if not already present
 	if env["GITHUB_WORKSPACE"] == "" {
 		if workDir := env["_VERMONT_WORK_DIR"]; workDir != "" {
@@ -159,7 +159,7 @@ func (e *Executor) createActionEnvironment(action *Action, inputs map[string]int
 			env["GITHUB_WORKSPACE"] = "/workspace"
 		}
 	}
-	
+
 	// Set default values for common GitHub Actions environment variables
 	if env["GITHUB_REPOSITORY"] == "" {
 		env["GITHUB_REPOSITORY"] = "owner/repo" // Default placeholder
