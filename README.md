@@ -24,7 +24,13 @@ git clone https://github.com/polatengin/vermont.git
 cd vermont
 
 # Build the application
-go build -o bin/vermont ./cmd/runner
+go build -o bin/vermont .
+
+# Or use the Makefile
+make build
+
+# Or run directly without building
+go run . [command] [options]
 ```
 
 ### Usage

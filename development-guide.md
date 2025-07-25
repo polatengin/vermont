@@ -8,22 +8,22 @@ You don't need to compile Vermont every time during development. Use `go run` to
 
 ```bash
 # Show help
-go run ./cmd/runner --help
+go run . --help
 
 # Show version  
-go run ./cmd/runner --version
+go run . --version
 
 # Validate a workflow
-go run ./cmd/runner validate examples/simple-test.yml
+go run . validate examples/simple-test.yml
 
 # Run a workflow
-go run ./cmd/runner run examples/simple-test.yml
+go run . run examples/simple-test.yml
 
 # Validate any YAML file
-go run ./cmd/runner validate path/to/your/workflow.yml
+go run . validate path/to/your/workflow.yml
 
 # Run any YAML file
-go run ./cmd/runner run path/to/your/workflow.yml
+go run . run path/to/your/workflow.yml
 ```
 
 ### Makefile Development Targets
@@ -57,8 +57,8 @@ make dev-server
 ### Development Workflow
 
 1. **Make code changes**
-2. **Test immediately**: `go run ./cmd/runner validate examples/simple-test.yml`
-3. **Run workflow**: `go run ./cmd/runner run examples/simple-test.yml`
+2. **Test immediately**: `go run . validate examples/simple-test.yml`
+3. **Run workflow**: `go run . run examples/simple-test.yml`
 4. **No build step needed** during development!
 
 ### Performance Notes

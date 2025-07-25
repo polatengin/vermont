@@ -46,7 +46,7 @@ build-verbose:
 build-runner:
 	@echo "Building vermont..."
 	@mkdir -p $(BIN_DIR)
-	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/vermont ./$(CMD_DIR)/runner
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/vermont .
 
 # Clean build artifacts
 clean:

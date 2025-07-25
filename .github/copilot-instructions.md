@@ -6,7 +6,7 @@ Vermont is a lightweight, Go-based GitHub Actions runner clone that executes Git
 ## Architecture & Core Components
 
 ### 🏗️ **Main Components**
-- **`cmd/runner/main.go`** - CLI interface with `vermont run` and `vermont validate` commands
+- **`cmd/main.go`** - CLI interface with `vermont run` and `vermont validate` commands
 - **`pkg/workflow/`** - YAML workflow parsing, validation, and data structures 
 - **`pkg/executor/`** - Core execution engine with job scheduling and dependency management
 - **`pkg/container/`** - Docker container management with automatic image building
