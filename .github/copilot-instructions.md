@@ -18,7 +18,7 @@ Vermont is a lightweight, Go-based GitHub Actions runner clone that executes Git
 
 ### 🔄 **Execution Flow**
 ```
-CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel Execution → Step Executor → Container/Host Execution
+CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel Execution → Step Executor → Container Execution
 ```
 
 ### 🧬 **Key Data Structures**
@@ -53,7 +53,7 @@ CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel
 ### Step Execution Engine
 - **Command Execution**: Shell command execution with proper error handling
 - **Environment Variables**: Job-level, step-level, and system environment inheritance
-- **Container Integration**: Seamless switching between host and container execution
+- **Container Integration**: Consistent container-based execution for all steps
 - **Output Management**: Real-time output streaming and structured logging
 
 ## 🛠️ **Development Patterns & Conventions**
@@ -164,8 +164,7 @@ examples/     - Comprehensive workflow examples for testing
 ## 📚 **Reference Information**
 
 ### Key Configuration Files
-- **`example-configs/host-config.json`** - Host execution configuration
-- **`example-configs/container-config.json`** - Container execution configuration
+- **`example-configs/config.json`** - Container execution configuration
 - **`Makefile`** - Development tasks and build targets
 
 ### Important Example Workflows

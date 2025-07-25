@@ -175,7 +175,7 @@ The Vermont step execution engine is now fully functional with the following cap
    - Docker-based step execution
    - Automatic image pulling and management
    - Shell detection (bash for Ubuntu, sh for Alpine)
-   - Host vs container execution based on configuration
+   - Container-only execution for consistency and isolation
 
 #### 🧪 **Testing Completed**
 
@@ -188,7 +188,7 @@ The Vermont step execution engine is now fully functional with the following cap
 - ✅ **Container execution** (`examples/container-test.yml`)
 - ✅ **Alpine Linux support** (`examples/alpine-test.yml`)
 - ✅ **Container error handling** (`examples/container-error-test.yml`)
-- ✅ **Host vs container mode switching** via configuration
+- ✅ **Container-only execution** for security and consistency
 
 #### 📊 **Performance**
 
@@ -257,39 +257,6 @@ Vermont now supports GitHub Actions marketplace actions with the following capab
 - ✅ **Template Processing** - `${{ inputs.name }}` expressions
 - ✅ **Input/Output Handling** - Action parameters and results
 - ✅ **Real Action Downloads** - `actions/checkout@v4`, `actions/setup-go@v4`, etc.
-
-#### 🎯 **Supported Actions**
-
-Vermont has been tested with popular GitHub Actions:
-
-- `actions/checkout@v4` - Repository checkout
-- `actions/setup-go@v4` - Go environment setup  
-- `actions/setup-node@v4` - Node.js environment setup
-- `actions/cache@v3` - Dependency caching
-- Custom composite actions - Local multi-step actions
-
-#### 📦 **Action Configuration**
-
-Vermont uses enhanced configuration to support GitHub Actions:
-
-```json
-{
-  "actions": {
-    "registry": "https://github.com",
-    "cacheEnabled": true,
-    "cacheTtl": 24,
-    "allowedOrgs": [],
-    "nodejsVersion": "20"
-  }
-}
-```
-
-Configuration options:
-- `registry`: Base URL for action downloads (default: "https://github.com")
-- `cacheEnabled`: Enable action caching (default: true)
-- `cacheTtl`: Cache time-to-live in hours (default: 24, 0 = no expiration)
-- `allowedOrgs`: Allowed GitHub organizations (empty = all allowed)
-- `nodejsVersion`: Default Node.js version for Node.js actions
 
 #### 🏛️ **Architecture Benefits**
 
@@ -546,17 +513,17 @@ Vermont provides comprehensive error handling for job dependencies:
 #### 📝 **Example Usage**
 
 ```bash
-# Execute workflow with real command execution (host mode)
-make dev-exec ARGS="run examples/simple-test.yml -c example-configs/host-config.json"
+# Execute workflow with container execution
+make dev-exec ARGS="run examples/simple-test.yml -c example-configs/config.json"
 
 # Execute workflow with GitHub Actions
-make dev-exec ARGS="run examples/simple-actions.yml -c example-configs/host-config.json"
+make dev-exec ARGS="run examples/simple-actions.yml -c example-configs/config.json"
 
 # Test actions demo with marketplace actions
-make dev-exec ARGS="run examples/actions-demo.yml -c example-configs/host-config.json"
+make dev-exec ARGS="run examples/actions-demo.yml -c example-configs/config.json"
 
 # Execute workflow in containers
-make dev-exec ARGS="run examples/container-test.yml -c example-configs/container-config.json"
+make dev-exec ARGS="run examples/container-test.yml -c example-configs/config.json"
 
 # Test different container images
 make dev-exec ARGS="run examples/alpine-test.yml -c example-configs/container-config.json"

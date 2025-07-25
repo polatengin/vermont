@@ -338,23 +338,14 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 	// Set up job environment
 	jobEnv := e.createJobEnvironment(jobID, job)
 
-	// Determine if we should use containers
-	useContainer := e.shouldUseContainer(job)
-	if useContainer {
-		// Check if Docker is available
-		if !e.containerManager.IsDockerAvailable(ctx) {
-			e.logger.Warn("Docker not available, falling back to host execution")
-			useContainer = false
-		}
+	// Check if Docker is available (required for all execution)
+	if !e.containerManager.IsDockerAvailable(ctx) {
+		return fmt.Errorf("Docker is required but not available. Please install and start Docker")
 	}
 
-	var containerImage string
-	if useContainer {
-		containerImage = e.containerManager.GetDefaultImage(job.GetRunsOn())
-		fmt.Printf("  Container: %s\n", containerImage)
-	} else {
-		fmt.Printf("  Execution: Host\n")
-	}
+	// Always use container execution
+	containerImage := e.containerManager.GetDefaultImage(job.GetRunsOn())
+	fmt.Printf("  Container: %s\n", containerImage)
 
 	// Execute steps
 	for i, step := range job.Steps {
@@ -377,25 +368,21 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 			// Execute the action
 			start := time.Now()
 
-			// Pass container context to action executor if using containers
+			// Pass container context to action executor (always using containers)
 			var result *actions.ActionExecutionResult
 			var err error
 
-			if useContainer {
-				// For container execution, we need to inform the action executor
-				// about the container environment
-				containerEnv := make(map[string]string)
-				for k, v := range jobEnv {
-					containerEnv[k] = v
-				}
-				containerEnv["_VERMONT_CONTAINER_MODE"] = "true"
-				containerEnv["_VERMONT_CONTAINER_IMAGE"] = containerImage
-				containerEnv["_VERMONT_WORK_DIR"] = e.config.Runner.WorkDir
-
-				result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, containerEnv)
-			} else {
-				result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, jobEnv)
+			// For container execution, we need to inform the action executor
+			// about the container environment
+			containerEnv := make(map[string]string)
+			for k, v := range jobEnv {
+				containerEnv[k] = v
 			}
+			containerEnv["_VERMONT_CONTAINER_MODE"] = "true"
+			containerEnv["_VERMONT_CONTAINER_IMAGE"] = containerImage
+			containerEnv["_VERMONT_WORK_DIR"] = e.config.Runner.WorkDir
+
+			result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, containerEnv)
 
 			duration := time.Since(start)
 
@@ -436,27 +423,22 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 		if step.Run != "" {
 			var result StepResult
 
-			if useContainer {
-				// Execute in container
-				containerResult, containerErr := e.containerManager.RunStep(ctx, step, containerImage, jobEnv, e.config.Runner.WorkDir)
-				if containerErr != nil {
-					e.logger.Error("Container step execution failed",
-						"job", jobID,
-						"step", stepNum,
-						"error", containerErr)
-					return fmt.Errorf("step %d failed: %v", stepNum, containerErr)
-				}
+			// Execute in container (always)
+			containerResult, containerErr := e.containerManager.RunStep(ctx, step, containerImage, jobEnv, e.config.Runner.WorkDir)
+			if containerErr != nil {
+				e.logger.Error("Container step execution failed",
+					"job", jobID,
+					"step", stepNum,
+					"error", containerErr)
+				return fmt.Errorf("step %d failed: %v", stepNum, containerErr)
+			}
 
-				// Convert container result to step result
-				result = StepResult{
-					Success:  containerResult.Success,
-					Output:   containerResult.Output,
-					Error:    containerResult.Error,
-					Duration: containerResult.Duration,
-				}
-			} else {
-				// Execute on host
-				result = e.executeStep(ctx, step, jobEnv)
+			// Convert container result to step result
+			result = StepResult{
+				Success:  containerResult.Success,
+				Output:   containerResult.Output,
+				Error:    containerResult.Error,
+				Duration: containerResult.Duration,
 			}
 
 			if !result.Success {
@@ -476,72 +458,12 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 				"job", jobID,
 				"step", stepNum,
 				"duration", result.Duration,
-				"container", useContainer)
+				"container", true)
 		}
 	}
 
 	e.logger.Info("Job completed", "job", jobID)
 	return nil
-}
-
-// executeStep executes a single step
-func (e *Executor) executeStep(ctx context.Context, step *workflow.Step, env map[string]string) StepResult {
-	start := time.Now()
-
-	// Parse the command
-	commands := strings.Split(strings.TrimSpace(step.Run), "\n")
-
-	var output strings.Builder
-
-	for _, command := range commands {
-		command = strings.TrimSpace(command)
-		if command == "" {
-			continue
-		}
-
-		// Execute the command
-		cmd := exec.CommandContext(ctx, "bash", "-c", command)
-
-		// Set environment variables
-		cmd.Env = os.Environ()
-		for key, value := range env {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-		}
-
-		// Set environment variables from step
-		for key, value := range step.Env {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-		}
-
-		// Execute command
-		out, err := cmd.CombinedOutput()
-		output.WriteString(string(out))
-
-		if err != nil {
-			e.logger.Error("Command execution failed",
-				"command", command,
-				"error", err,
-				"output", string(out))
-
-			return StepResult{
-				Success:  false,
-				Output:   output.String(),
-				Error:    fmt.Sprintf("Command failed: %s - %v", command, err),
-				Duration: time.Since(start),
-			}
-		}
-
-		e.logger.Debug("Command executed",
-			"command", command,
-			"output", string(out))
-	}
-
-	return StepResult{
-		Success:  true,
-		Output:   output.String(),
-		Error:    "",
-		Duration: time.Since(start),
-	}
 }
 
 // createJobEnvironment creates environment variables for a job
@@ -663,14 +585,3 @@ func (e *Executor) ensureWorkDirectory() {
 	e.logger.Debug("Work directory ensured", "dir", workDir)
 }
 
-// shouldUseContainer determines if a job should run in a container
-func (e *Executor) shouldUseContainer(job *workflow.Job) bool {
-	// Check configuration setting
-	if e.config.Container.Runtime == "" || e.config.Container.Runtime == "none" {
-		return false
-	}
-
-	// For now, use container execution if Docker is configured
-	// In the future, this could be more sophisticated based on job requirements
-	return e.config.Container.Runtime == "docker"
-}

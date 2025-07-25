@@ -229,6 +229,15 @@ func (e *Executor) executeCompositeAction(ctx context.Context, action *Action, e
 		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 	githubOutputFile := filepath.Join(tmpDir, "github_output")
+	githubStepSummaryFile := filepath.Join(tmpDir, "github_step_summary")
+
+	// Create GitHub Actions output files
+	if err := os.WriteFile(githubOutputFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_OUTPUT file: %w", err)
+	}
+	if err := os.WriteFile(githubStepSummaryFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_STEP_SUMMARY file: %w", err)
+	}
 
 	// Add GITHUB_OUTPUT to environment
 	actionEnv := make(map[string]string)
@@ -318,64 +327,15 @@ func (e *Executor) executeCompositeStep(ctx context.Context, action *Action, ste
 
 // executeShellStep executes a shell command step
 func (e *Executor) executeShellStep(ctx context.Context, workingDir, command, shell string, env map[string]string) (*ActionExecutionResult, error) {
-	start := time.Now()
-
-	// Use bash as default shell
-	if shell == "" {
-		shell = "bash"
-	}
-
-	e.logger.Info("Executing shell step",
+	// Composite actions with shell steps require container execution
+	// This is a simplified implementation that should be enhanced to work with containers
+	e.logger.Error("Composite actions with shell steps require container implementation",
 		"command", command,
-		"shell", shell,
 		"workingDir", workingDir)
-
-	// Execute the command
-	cmd := exec.CommandContext(ctx, shell, "-c", command)
-
-	// Set working directory
-	if workingDir != "" {
-		cmd.Dir = workingDir
-	}
-
-	// Set environment variables
-	cmd.Env = os.Environ()
-	for key, value := range env {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
-	}
-
-	// Execute command and capture output
-	output, err := cmd.CombinedOutput()
-	duration := time.Since(start)
-
-	if err != nil {
-		e.logger.Error("Shell command failed",
-			"command", command,
-			"error", err,
-			"output", string(output))
-
-		return &ActionExecutionResult{
-			Success: false,
-			Error:   fmt.Sprintf("Command failed: %v - Output: %s", err, string(output)),
-		}, nil
-	}
-
-	e.logger.Debug("Shell command completed",
-		"command", command,
-		"duration", duration,
-		"output", string(output))
-
-	// Parse outputs from command output if needed
-	// For now, just return the output as a message
-	outputs := map[string]string{}
-	if strings.TrimSpace(string(output)) != "" {
-		outputs["message"] = strings.TrimSpace(string(output))
-	}
-
+	
 	return &ActionExecutionResult{
-		Success:  true,
-		Outputs:  outputs,
-		Duration: duration.String(),
+		Success: false,
+		Error:   "Composite actions with shell steps are not yet supported in container-only mode",
 	}, nil
 }
 
@@ -392,130 +352,10 @@ func (e *Executor) executeNodeAction(ctx context.Context, action *Action, env ma
 		return e.executeNodeActionInContainer(ctx, action, env, containerImage, workDir)
 	}
 
-	// Check if Node.js is available on host
-	if _, err := exec.LookPath("node"); err != nil {
-		e.logger.Warn("Node.js not found, action may fail", "action", action.Reference)
-		return &ActionExecutionResult{
-			Success: false,
-			Error:   "Node.js runtime not available. Please install Node.js or use a container with Node.js",
-		}, nil
-	}
-
-	return e.executeNodeActionOnHost(ctx, action, env)
-}
-
-// executeNodeActionOnHost executes a Node.js action on the host system
-func (e *Executor) executeNodeActionOnHost(ctx context.Context, action *Action, env map[string]string) (*ActionExecutionResult, error) {
-
-	// Get the main script from metadata
-	mainScript := action.Metadata.Runs.Main
-	if mainScript == "" {
-		return &ActionExecutionResult{
-			Success: false,
-			Error:   "Node.js action missing 'main' script in runs configuration",
-		}, nil
-	}
-
-	// Full path to the main script
-	scriptPath := filepath.Join(action.LocalPath, mainScript)
-	if _, err := os.Stat(scriptPath); err != nil {
-		return &ActionExecutionResult{
-			Success: false,
-			Error:   fmt.Sprintf("Main script not found: %s", scriptPath),
-		}, nil
-	}
-
-	// Check if package.json exists and install dependencies if needed
-	packageJsonPath := filepath.Join(action.LocalPath, "package.json")
-	if _, err := os.Stat(packageJsonPath); err == nil {
-		// Check if node_modules exists
-		nodeModulesPath := filepath.Join(action.LocalPath, "node_modules")
-		if _, err := os.Stat(nodeModulesPath); err != nil {
-			e.logger.Info("Installing Node.js dependencies", "action", action.Reference)
-
-			// Run npm install
-			cmd := exec.CommandContext(ctx, "npm", "install", "--production")
-			cmd.Dir = action.LocalPath
-			cmd.Env = os.Environ()
-
-			if output, err := cmd.CombinedOutput(); err != nil {
-				e.logger.Warn("npm install failed", "action", action.Reference, "output", string(output))
-				// Continue anyway, some actions might work without all dependencies
-			}
-		}
-	}
-
-	// Create temporary directory for outputs
-	tmpDir := "/tmp/vermont-action-" + strings.ReplaceAll(action.Reference, "/", "-")
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
-	}
-
-	// Set up GitHub Actions environment variables
-	actionEnv := make([]string, 0, len(env)+10)
-	for k, v := range env {
-		actionEnv = append(actionEnv, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	// Add GitHub Actions specific environment variables
-	githubOutputFile := filepath.Join(tmpDir, "github_output")
-	githubStepSummaryFile := filepath.Join(tmpDir, "github_step_summary")
-
-	actionEnv = append(actionEnv, fmt.Sprintf("GITHUB_OUTPUT=%s", githubOutputFile))
-	actionEnv = append(actionEnv, fmt.Sprintf("GITHUB_STEP_SUMMARY=%s", githubStepSummaryFile))
-	actionEnv = append(actionEnv, fmt.Sprintf("RUNNER_TEMP=%s", tmpDir))
-	actionEnv = append(actionEnv, fmt.Sprintf("RUNNER_TOOL_CACHE=%s/tool-cache", tmpDir))
-
-	// Execute the Node.js script
-	e.logger.Debug("Running Node.js action", "script", scriptPath)
-
-	cmd := exec.CommandContext(ctx, "node", scriptPath)
-	cmd.Dir = action.LocalPath
-	cmd.Env = actionEnv
-
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-
-	// Read outputs from GITHUB_OUTPUT file
-	outputs := make(map[string]string)
-	if data, err := os.ReadFile(githubOutputFile); err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line != "" && strings.Contains(line, "=") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					outputs[parts[0]] = parts[1]
-				}
-			}
-		}
-	}
-
-	// Clean up temporary directory
-	defer func() {
-		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
-			e.logger.Warn("Failed to clean up temporary directory", "dir", tmpDir, "error", cleanupErr)
-		}
-	}()
-
-	if err != nil {
-		e.logger.Error("Node.js action execution failed",
-			"action", action.Reference,
-			"error", err,
-			"output", outputStr)
-
-		return &ActionExecutionResult{
-			Success: false,
-			Error:   fmt.Sprintf("Node.js action failed: %v\nOutput: %s", err, outputStr),
-			Outputs: outputs,
-		}, nil
-	}
-
-	e.logger.Info("Node.js action completed successfully", "action", action.Reference)
-
+	// No host execution - require container mode
 	return &ActionExecutionResult{
-		Success: true,
-		Outputs: outputs,
+		Success: false,
+		Error:   "Node.js actions require container execution. Please configure container runtime in config",
 	}, nil
 }
 
@@ -596,7 +436,15 @@ func (e *Executor) executeDockerAction(ctx context.Context, action *Action, env 
 
 	// Set up GitHub Actions environment variables
 	githubOutputFile := filepath.Join(tmpDir, "github_output")
-	_ = filepath.Join(tmpDir, "github_step_summary") // For future use
+	githubStepSummaryFile := filepath.Join(tmpDir, "github_step_summary")
+
+	// Create GitHub Actions output files
+	if err := os.WriteFile(githubOutputFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_OUTPUT file: %w", err)
+	}
+	if err := os.WriteFile(githubStepSummaryFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_STEP_SUMMARY file: %w", err)
+	}
 
 	// Build docker run command
 	dockerArgs := []string{
@@ -694,6 +542,16 @@ func (e *Executor) executeNodeActionInContainer(ctx context.Context, action *Act
 		}
 	}()
 
+	// Create GitHub Actions output files
+	githubOutputFile := filepath.Join(tmpDir, "github_output")
+	githubStepSummaryFile := filepath.Join(tmpDir, "github_step_summary")
+	if err := os.WriteFile(githubOutputFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_OUTPUT file: %w", err)
+	}
+	if err := os.WriteFile(githubStepSummaryFile, []byte(""), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create GITHUB_STEP_SUMMARY file: %w", err)
+	}
+
 	// Create container ID
 	containerID := fmt.Sprintf("vermont-node-action-%d", time.Now().UnixNano())
 
@@ -756,7 +614,6 @@ func (e *Executor) executeNodeActionInContainer(ctx context.Context, action *Act
 
 	// Read outputs from GITHUB_OUTPUT file
 	outputs := make(map[string]string)
-	githubOutputFile := filepath.Join(tmpDir, "github_output")
 	if data, err := os.ReadFile(githubOutputFile); err == nil {
 		lines := strings.Split(string(data), "\n")
 		for _, line := range lines {

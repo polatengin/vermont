@@ -14,12 +14,6 @@ jobs:
           echo "Current directory contents:"
           ls -la
 
-      - name: Use local composite action
-        uses: ./examples/actions/hello-composite
-        with:
-          name: "Vermont User"
-          greeting: "Welcome"
-
   cache-example:
     runs-on: ubuntu-latest
     steps:

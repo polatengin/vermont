@@ -34,11 +34,6 @@ Thumbs.db
 tmp/
 .vermont/
 
-# Configuration files (keep examples)
-config.json
-vermont.json
-!examples/
-
 # Docker
 .dockerignore
 
