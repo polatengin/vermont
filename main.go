@@ -319,13 +319,13 @@ func cloneSteps(steps []*Step, matrixVars map[string]interface{}) []*Step {
 // substituteMatrixVars replaces ${{ matrix.* }} variables in strings
 func substituteMatrixVars(text string, matrixVars map[string]interface{}) string {
 	result := text
-	
+
 	// First, substitute all variables that exist in matrixVars
 	for key, value := range matrixVars {
 		placeholder := fmt.Sprintf("${{ matrix.%s }}", key)
 		result = strings.ReplaceAll(result, placeholder, fmt.Sprintf("%v", value))
 	}
-	
+
 	// Then, find any remaining matrix variables and substitute them with empty string
 	// This handles cases where a matrix variable is referenced but doesn't exist in this combination
 	for {
@@ -338,11 +338,11 @@ func substituteMatrixVars(text string, matrixVars map[string]interface{}) string
 			break
 		}
 		end += start + 3 // Include the " }}"
-		
+
 		// Replace unknown matrix variable with empty string
 		result = result[:start] + result[end:]
 	}
-	
+
 	return result
 }
 
