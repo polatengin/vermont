@@ -20,17 +20,21 @@ type Config struct {
 
 // Workflow represents a GitHub Actions workflow
 type Workflow struct {
-	Name string          `yaml:"name"`
-	On   interface{}     `yaml:"on"`
-	Jobs map[string]*Job `yaml:"jobs"`
+	Name string            `yaml:"name"`
+	On   interface{}       `yaml:"on"`
+	Jobs map[string]*Job   `yaml:"jobs"`
+	Env  map[string]string `yaml:"env,omitempty"`
 }
 
 // Job represents a single job in a workflow
 type Job struct {
-	RunsOn   interface{} `yaml:"runs-on"`
-	Needs    []string    `yaml:"needs"`
-	Steps    []*Step     `yaml:"steps"`
-	Strategy *Strategy   `yaml:"strategy"`
+	RunsOn      interface{}       `yaml:"runs-on"`
+	Needs       []string          `yaml:"needs"`
+	Steps       []*Step           `yaml:"steps"`
+	Strategy    *Strategy         `yaml:"strategy"`
+	If          string            `yaml:"if,omitempty"`
+	Outputs     map[string]string `yaml:"outputs,omitempty"`
+	Environment string            `yaml:"environment,omitempty"`
 }
 
 // Strategy represents the strategy configuration for a job
@@ -392,6 +396,58 @@ func substituteActionTemplates(text string, inputs map[string]interface{}, stepO
 			placeholder := fmt.Sprintf("${{ steps.%s.outputs.%s }}", stepId, outputName)
 			result = strings.ReplaceAll(result, placeholder, value)
 		}
+	}
+
+	return result
+}
+
+// substituteWorkflowTemplates replaces workflow context template variables with safe defaults
+func substituteWorkflowTemplates(text string, workflowEnv map[string]string) string {
+	result := text
+
+	// Handle workflow environment variables: ${{ env.VAR }}
+	for key, value := range workflowEnv {
+		placeholder := fmt.Sprintf("${{ env.%s }}", key)
+		result = strings.ReplaceAll(result, placeholder, value)
+	}
+
+	// Handle unknown template expressions with safe defaults
+	// This prevents bash substitution errors by replacing unknown variables
+	for {
+		start := strings.Index(result, "${{")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], "}}")
+		if end == -1 {
+			break
+		}
+		end += start + 2 // Include the "}}"
+
+		// Extract the template expression
+		templateExpr := result[start:end]
+
+		// Provide safe defaults for common patterns
+		var replacement string
+		switch {
+		case strings.Contains(templateExpr, "needs.") && strings.Contains(templateExpr, ".result"):
+			// Job result expressions: default to "success" for demo purposes
+			replacement = "success"
+		case strings.Contains(templateExpr, "needs.") && strings.Contains(templateExpr, ".outputs."):
+			// Job output expressions: default to "unknown"
+			replacement = "unknown"
+		case strings.Contains(templateExpr, "github.ref"):
+			// GitHub ref expressions: default to main branch
+			replacement = "refs/heads/main"
+		case strings.Contains(templateExpr, "env."):
+			// Environment variables: extract name and use empty default
+			replacement = ""
+		default:
+			// Unknown expressions: replace with empty string
+			replacement = ""
+		}
+
+		result = result[:start] + replacement + result[end:]
 	}
 
 	return result
@@ -849,7 +905,7 @@ func executeWorkflow(workflow *Workflow, config *Config) error {
 	expandedJobs := expandMatrixJobs(workflow.Jobs)
 
 	// Build dependency graph and execute jobs
-	return executeJobs(expandedJobs, config, pipelineDir)
+	return executeJobs(expandedJobs, config, pipelineDir, workflow.Env)
 }
 
 func createPipelineDir(workflowName string) (string, error) {
@@ -864,7 +920,7 @@ func createPipelineDir(workflowName string) (string, error) {
 	return pipelineDir, os.MkdirAll(pipelineDir, 0755)
 }
 
-func executeJobs(jobs map[string]*Job, config *Config, pipelineDir string) error {
+func executeJobs(jobs map[string]*Job, config *Config, pipelineDir string, workflowEnv map[string]string) error {
 	// Create steps directory for actions
 	stepsDir := filepath.Join(pipelineDir, "steps")
 	if err := os.MkdirAll(stepsDir, 0755); err != nil {
@@ -890,7 +946,7 @@ func executeJobs(jobs map[string]*Job, config *Config, pipelineDir string) error
 		}
 
 		// Execute steps in container
-		if err := executeJobSteps(job, jobDir, runnerImage, config, stepsDir); err != nil {
+		if err := executeJobSteps(job, jobDir, runnerImage, config, stepsDir, workflowEnv); err != nil {
 			return fmt.Errorf("job %s failed: %w", jobName, err)
 		}
 	}
@@ -979,7 +1035,7 @@ func buildRunnerImage(dockerfileName, imageName string) error {
 	return nil
 }
 
-func executeJobSteps(job *Job, jobDir, runnerImage string, config *Config, stepsDir string) error {
+func executeJobSteps(job *Job, jobDir, runnerImage string, config *Config, stepsDir string, workflowEnv map[string]string) error {
 	for i, step := range job.Steps {
 		stepNum := i + 1
 		if step.Name != "" {
@@ -990,7 +1046,7 @@ func executeJobSteps(job *Job, jobDir, runnerImage string, config *Config, steps
 
 		if step.Run != "" {
 			// Execute shell command in container
-			if err := executeRunStep(step, jobDir, runnerImage, config); err != nil {
+			if err := executeRunStep(step, jobDir, runnerImage, config, workflowEnv); err != nil {
 				return fmt.Errorf("step %d failed: %w", stepNum, err)
 			}
 		} else if step.Uses != "" {
@@ -1004,7 +1060,10 @@ func executeJobSteps(job *Job, jobDir, runnerImage string, config *Config, steps
 	return nil
 }
 
-func executeRunStep(step *Step, jobDir, runnerImage string, config *Config) error {
+func executeRunStep(step *Step, jobDir, runnerImage string, config *Config, workflowEnv map[string]string) error {
+	// Process workflow templates in the run command
+	processedRun := substituteWorkflowTemplates(step.Run, workflowEnv)
+
 	// Prepare environment variables
 	env := make([]string, 0)
 
@@ -1033,7 +1092,7 @@ func executeRunStep(step *Step, jobDir, runnerImage string, config *Config) erro
 	args = append(args, runnerImage)
 
 	// Add shell command
-	args = append(args, "bash", "-c", step.Run)
+	args = append(args, "bash", "-c", processedRun)
 
 	// Execute command
 	cmd := exec.Command("docker", args...)
