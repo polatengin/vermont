@@ -482,7 +482,11 @@ func (e *Executor) executeNodeActionOnHost(ctx context.Context, action *Action, 
 	}
 
 	// Clean up temporary directory
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
+			e.logger.Warn("Failed to clean up temporary directory", "dir", tmpDir, "error", cleanupErr)
+		}
+	}()
 
 	if err != nil {
 		e.logger.Error("Node.js action execution failed",
@@ -574,7 +578,11 @@ func (e *Executor) executeDockerAction(ctx context.Context, action *Action, env 
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
+			e.logger.Warn("Failed to clean up temporary directory", "dir", tmpDir, "error", cleanupErr)
+		}
+	}()
 
 	// Set up GitHub Actions environment variables
 	githubOutputFile := filepath.Join(tmpDir, "github_output")
@@ -670,7 +678,11 @@ func (e *Executor) executeNodeActionInContainer(ctx context.Context, action *Act
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpDir); cleanupErr != nil {
+			e.logger.Warn("Failed to clean up temporary directory", "dir", tmpDir, "error", cleanupErr)
+		}
+	}()
 
 	// Create container ID
 	containerID := fmt.Sprintf("vermont-node-action-%d", time.Now().UnixNano())
