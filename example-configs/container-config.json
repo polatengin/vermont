@@ -1,6 +1,6 @@
 {
   "runner": {
-    "workDir": "/workspaces/vermont",
+    "workDir": "/tmp/vermont-workspace",
     "maxConcurrentJobs": 2,
     "timeout": 3600,
     "labels": ["self-hosted", "vermont"]

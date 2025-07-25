@@ -565,7 +565,7 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	}
 
 	env["GITHUB_EVENT_NAME"] = "push"
-	env["GITHUB_SHA"] = "abc123"
+	env["GITHUB_SHA"] = "da41adc514a365ee6d9d96b958fa6ef6aae88069"
 	env["GITHUB_REF"] = "refs/heads/main"
 	env["GITHUB_HEAD_REF"] = ""
 	env["GITHUB_BASE_REF"] = ""
