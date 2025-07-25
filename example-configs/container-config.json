@@ -27,5 +27,11 @@
     "cacheTtl": 24,
     "allowedOrgs": [],
     "nodejsVersion": "20"
+  },
+  "env": {
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "CI": "true",
+    "VERMONT_RUNNER": "true",
+    "NODE_ENV": "production"
   }
 }

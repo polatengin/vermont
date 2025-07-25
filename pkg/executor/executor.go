@@ -548,6 +548,11 @@ func (e *Executor) executeStep(ctx context.Context, step *workflow.Step, env map
 func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[string]string {
 	env := make(map[string]string)
 
+	// Start with environment variables from config
+	for key, value := range e.config.GetEnvironmentVariables() {
+		env[key] = value
+	}
+
 	// Default GitHub Actions environment variables
 	env["GITHUB_WORKFLOW"] = jobID
 	env["GITHUB_JOB"] = jobID
@@ -564,7 +569,7 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	env["RUNNER_NAME"] = "Vermont Runner"
 	env["RUNNER_TOOL_CACHE"] = "/opt/hostedtoolcache"
 
-	// Add job-specific environment variables
+	// Add job-specific environment variables (these can override config env vars)
 	for key, value := range job.Env {
 		env[key] = value
 	}

@@ -23,6 +23,9 @@ type Config struct {
 
 	// Actions configuration
 	Actions ActionsConfig `json:"actions"`
+
+	// Environment variables configuration
+	Env map[string]string `json:"env,omitempty"`
 }
 
 // RunnerConfig contains runner-specific settings
@@ -133,6 +136,7 @@ func Default() *Config {
 			AllowedOrgs:   []string{}, // Empty = allow all
 			NodejsVersion: "20",
 		},
+		Env: make(map[string]string),
 	}
 }
 
@@ -150,6 +154,16 @@ func Load(configFile string) (*Config, error) {
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Initialize env map if nil
+	if config.Env == nil {
+		config.Env = make(map[string]string)
+	}
+
+	// Apply environment variables from config
+	if err := config.applyEnvironmentVariables(); err != nil {
+		return nil, fmt.Errorf("failed to apply environment variables: %w", err)
 	}
 
 	// Ensure directories exist
@@ -172,6 +186,36 @@ func (c *Config) Save(configFile string) error {
 	}
 
 	return nil
+}
+
+// applyEnvironmentVariables sets environment variables from the config
+func (c *Config) applyEnvironmentVariables() error {
+	for key, value := range c.Env {
+		// Support environment variable expansion (e.g., ${GITHUB_TOKEN})
+		expandedValue := os.ExpandEnv(value)
+		if err := os.Setenv(key, expandedValue); err != nil {
+			return fmt.Errorf("failed to set environment variable %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+// GetEnvironmentVariables returns a copy of all environment variables from config
+func (c *Config) GetEnvironmentVariables() map[string]string {
+	env := make(map[string]string)
+	for key, value := range c.Env {
+		// Support environment variable expansion
+		env[key] = os.ExpandEnv(value)
+	}
+	return env
+}
+
+// SetEnvironmentVariable sets an environment variable in the config
+func (c *Config) SetEnvironmentVariable(key, value string) {
+	if c.Env == nil {
+		c.Env = make(map[string]string)
+	}
+	c.Env[key] = value
 }
 
 // ensureDirectories creates necessary directories
