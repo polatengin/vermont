@@ -553,22 +553,22 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 		env[key] = value
 	}
 
+	// Get Git information from the current repository
+	gitInfo := e.getGitInfo()
+
 	// Default GitHub Actions environment variables
 	env["GITHUB_WORKFLOW"] = jobID
 	env["GITHUB_JOB"] = jobID
 	env["GITHUB_ACTION"] = ""
 	env["GITHUB_ACTOR"] = "vermont-runner"
 
-	// Set GITHUB_REPOSITORY from config environment or default
-	if repo := env["GITHUB_REPOSITORY"]; repo == "" {
-		env["GITHUB_REPOSITORY"] = "polatengin/vermont"
-	}
-
+	// Set Git-based environment variables
+	env["GITHUB_REPOSITORY"] = gitInfo["GITHUB_REPOSITORY"]
 	env["GITHUB_EVENT_NAME"] = "push"
-	env["GITHUB_SHA"] = "da41adc514a365ee6d9d96b958fa6ef6aae88069"
-	env["GITHUB_REF"] = "refs/heads/main"
-	env["GITHUB_HEAD_REF"] = ""
-	env["GITHUB_BASE_REF"] = ""
+	env["GITHUB_SHA"] = gitInfo["GITHUB_SHA"]
+	env["GITHUB_REF"] = gitInfo["GITHUB_REF"]
+	env["GITHUB_HEAD_REF"] = gitInfo["GITHUB_HEAD_REF"]
+	env["GITHUB_BASE_REF"] = gitInfo["GITHUB_BASE_REF"]
 	env["RUNNER_OS"] = "Linux"
 	env["RUNNER_ARCH"] = "X64"
 	env["RUNNER_NAME"] = "Vermont Runner"
@@ -580,6 +580,64 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	}
 
 	return env
+}
+
+// getGitInfo reads Git information from the current repository
+func (e *Executor) getGitInfo() map[string]string {
+	gitInfo := make(map[string]string)
+
+	// Get current commit SHA
+	if cmd := exec.Command("git", "rev-parse", "HEAD"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			gitInfo["GITHUB_SHA"] = strings.TrimSpace(string(output))
+		}
+	}
+
+	// Get current branch name
+	if cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			branchName := strings.TrimSpace(string(output))
+			if branchName != "" && branchName != "HEAD" {
+				gitInfo["GITHUB_REF"] = "refs/heads/" + branchName
+			}
+		}
+	}
+
+	// Get remote origin URL to determine repository
+	if cmd := exec.Command("git", "config", "--get", "remote.origin.url"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			remoteURL := strings.TrimSpace(string(output))
+			if repo := parseGitHubRepository(remoteURL); repo != "" {
+				gitInfo["GITHUB_REPOSITORY"] = repo
+			}
+		}
+	}
+
+	// For pull requests, try to get head and base refs
+	// This is more complex and would require additional logic to detect PR context
+	// For now, we'll leave them empty as they're mainly used in PR workflows
+
+	return gitInfo
+}
+
+// parseGitHubRepository extracts owner/repo from a GitHub remote URL
+func parseGitHubRepository(remoteURL string) string {
+	// Handle both HTTPS and SSH formats
+	// HTTPS: https://github.com/owner/repo.git
+	// SSH: git@github.com:owner/repo.git
+
+	if strings.Contains(remoteURL, "github.com") {
+		// Remove .git suffix if present
+		remoteURL = strings.TrimSuffix(remoteURL, ".git")
+
+		if strings.HasPrefix(remoteURL, "https://github.com/") {
+			return strings.TrimPrefix(remoteURL, "https://github.com/")
+		} else if strings.HasPrefix(remoteURL, "git@github.com:") {
+			return strings.TrimPrefix(remoteURL, "git@github.com:")
+		}
+	}
+
+	return ""
 }
 
 // ensureWorkDirectory ensures the work directory exists and has proper permissions
