@@ -147,6 +147,16 @@ func (e *Executor) createActionEnvironment(action *Action, inputs map[string]int
 		env[envName] = fmt.Sprintf("%v", value)
 	}
 
+	// Special handling for common actions that need default inputs
+	// If this is actions/checkout and no token is provided, use GITHUB_TOKEN if available
+	if strings.Contains(action.Reference, "actions/checkout") {
+		if _, tokenProvided := inputs["token"]; !tokenProvided {
+			if githubToken := env["GITHUB_TOKEN"]; githubToken != "" {
+				env["INPUT_TOKEN"] = githubToken
+			}
+		}
+	}
+
 	// Add action-specific environment variables
 	env["GITHUB_ACTION"] = action.Reference
 	env["GITHUB_ACTION_PATH"] = action.LocalPath

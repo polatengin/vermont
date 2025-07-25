@@ -558,7 +558,12 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	env["GITHUB_JOB"] = jobID
 	env["GITHUB_ACTION"] = ""
 	env["GITHUB_ACTOR"] = "vermont-runner"
-	env["GITHUB_REPOSITORY"] = "local/repository"
+
+	// Set GITHUB_REPOSITORY from config environment or default
+	if repo := env["GITHUB_REPOSITORY"]; repo == "" {
+		env["GITHUB_REPOSITORY"] = "polatengin/vermont"
+	}
+
 	env["GITHUB_EVENT_NAME"] = "push"
 	env["GITHUB_SHA"] = "abc123"
 	env["GITHUB_REF"] = "refs/heads/main"

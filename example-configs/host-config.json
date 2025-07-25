@@ -21,15 +21,9 @@
     "format": "console",
     "file": ""
   },
-  "actions": {
-    "registry": "https://github.com",
-    "cacheEnabled": true,
-    "cacheTtl": 24,
-    "allowedOrgs": [],
-    "nodejsVersion": "20"
-  },
   "env": {
     "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "GITHUB_REPOSITORY": "polatengin/vermont",
     "CI": "true",
     "VERMONT_RUNNER": "true",
     "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
