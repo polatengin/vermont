@@ -11,7 +11,8 @@ Vermont is a lightweight, Go-based GitHub Actions runner clone that executes Git
 - **`pkg/executor/`** - Core execution engine with job scheduling and dependency management
 - **`pkg/container/`** - Docker container management with automatic image building
 - **`pkg/actions/`** - GitHub Actions marketplace integration and execution
-- **`internal/config/`** - Configuration management for runner, container, and action settings
+- **`pkg/storage/`** - Storage abstraction layer (currently placeholder for future expansion)
+- **`internal/config/`** - Configuration management for runner, container, actions, storage, and logging settings
 - **`internal/logger/`** - Structured logging throughout the application
 - **`runners/`** - Dockerfiles for various OS variants (Ubuntu, Debian, Alpine, CentOS)
 
@@ -22,10 +23,11 @@ CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel
 
 ### 🧬 **Key Data Structures**
 - **`Workflow`** - Top-level workflow with jobs, triggers, and global settings
-- **`Job`** - Individual job with steps, dependencies (`needs`), and execution context
+- **`Job`** - Individual job with steps, dependencies (`needs`), matrix strategy, and execution context
 - **`Step`** - Single execution unit with `run` commands or `uses` actions
 - **`JobScheduler`** - Manages job dependencies, parallel execution, and state tracking
 - **`JobState`** - Tracks individual job status (Pending → Ready → Running → Completed/Failed)
+- **`MatrixCombination`** - Represents matrix strategy variable combinations for job expansion
 
 ## 🚀 **Key Features & Implementation**
 
@@ -34,6 +36,7 @@ CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel
 - **Parallel Execution**: Goroutine-based concurrent job execution with semaphore limits
 - **State Management**: Job state tracking with dependency completion monitoring
 - **Error Handling**: Deadlock detection and proper error propagation
+- **Matrix Build Support**: Automatic job expansion from matrix strategies with multi-dimensional combinations
 
 ### GitHub Actions Marketplace Integration
 - **Action Management**: Download, cache, and version actions from GitHub repositories
@@ -116,7 +119,7 @@ examples/     - Comprehensive workflow examples for testing
 2. Extend parser validation in `workflow.go`
 3. Update executor logic in `pkg/executor/executor.go`
 4. Add example workflow in `examples/`
-5. Test with `make dev-exec ARGS="run examples/your-test.yml"`
+5. Test with `make dev-run FILE=examples/your-test.yml` or `make dev-exec ARGS="run examples/your-test.yml"`
 
 ### Adding Container Support for New OS
 1. Create `runners/Dockerfile.<os>-<version>` with development toolchain
@@ -125,6 +128,7 @@ examples/     - Comprehensive workflow examples for testing
 
 ### Debugging Execution Issues
 - Use `make dev-exec ARGS="run examples/your-workflow.yml -v"` for verbose logging
+- Use `make dev-run FILE=examples/your-workflow.yml` for quick testing without compilation
 - Check container logs for container execution issues
 - Verify action downloads in `~/.vermont/actions/` cache directory
 - Use structured logging to trace execution flow
@@ -170,9 +174,12 @@ examples/     - Comprehensive workflow examples for testing
 - **`examples/parallel-test.yml`** - Parallel execution testing
 - **`examples/actions-demo.yml`** - GitHub Actions marketplace integration
 - **`examples/container-test.yml`** - Container execution testing
+- **`examples/matrix-demo.yml`** - Matrix build strategy demonstrations
 
 ### Build & Development
 - **`make build`** - Build the Vermont binary
+- **`make dev-run FILE=<workflow>`** - Run workflow with go run (no compilation needed)
+- **`make dev-validate FILE=<workflow>`** - Validate workflow with go run
 - **`make dev-exec ARGS="run <workflow>"`** - Execute workflow in development
 - **`make lint`** - Run code quality checks
 - **`make test`** - Run test suite
