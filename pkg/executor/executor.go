@@ -371,7 +371,27 @@ func (e *Executor) executeJob(ctx context.Context, jobID string, job *workflow.J
 
 			// Execute the action
 			start := time.Now()
-			result, err := e.actionExecutor.Execute(ctx, step.Uses, inputs, jobEnv)
+
+			// Pass container context to action executor if using containers
+			var result *actions.ActionExecutionResult
+			var err error
+
+			if useContainer {
+				// For container execution, we need to inform the action executor
+				// about the container environment
+				containerEnv := make(map[string]string)
+				for k, v := range jobEnv {
+					containerEnv[k] = v
+				}
+				containerEnv["_VERMONT_CONTAINER_MODE"] = "true"
+				containerEnv["_VERMONT_CONTAINER_IMAGE"] = containerImage
+				containerEnv["_VERMONT_WORK_DIR"] = e.config.Runner.WorkDir
+
+				result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, containerEnv)
+			} else {
+				result, err = e.actionExecutor.Execute(ctx, step.Uses, inputs, jobEnv)
+			}
+
 			duration := time.Since(start)
 
 			if err != nil {
