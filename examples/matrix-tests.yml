@@ -1,0 +1,54 @@
+name: Matrix Strategy Tests
+on: [push]
+
+jobs:
+  # Basic matrix test
+  matrix-basic:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: [1.21, 1.22, 1.23]
+        os: [ubuntu, debian, alpine]
+    steps:
+      - name: Show matrix values
+        run: |
+          echo "=== Matrix Test ==="
+          echo "Running on ${{ matrix.os }} with version ${{ matrix.version }}"
+          echo "Matrix combination: ${{ matrix.os }}-${{ matrix.version }}"
+          echo "✅ Matrix combination tested!"
+
+  # Advanced matrix with strategy options
+  matrix-advanced:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        lang: [go, node, python]
+        version: [18, 19, 20]
+        include:
+          - lang: go
+            version: 21
+            experimental: true
+        exclude:
+          - lang: python
+            version: 18
+    steps:
+      - name: Setup environment
+        run: |
+          echo "=== Advanced Matrix Setup ==="
+          echo "Language: ${{ matrix.lang }}"
+          echo "Version: ${{ matrix.version }}"
+          if [ "${{ matrix.experimental }}" = "true" ]; then
+            echo "⚠️  Experimental build"
+          fi
+          
+      - name: Checkout for matrix build
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Matrix build simulation
+        run: |
+          echo "Building ${{ matrix.lang }} project with version ${{ matrix.version }}"
+          echo "Build completed successfully!"

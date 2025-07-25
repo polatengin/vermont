@@ -1,0 +1,67 @@
+name: GitHub Actions Tests
+on: [push]
+
+jobs:
+  # Basic actions test
+  actions-basic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Verify checkout action
+        run: |
+          echo "=== Checkout Action Test ==="
+          echo "Repository checked out successfully!"
+          echo "Files:"
+          ls -la
+          echo "Git status:"
+          git status --short || echo "No git changes"
+
+  # Composite action test
+  composite-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use local composite action
+        uses: ./examples/actions/hello-composite
+        with:
+          name: "Vermont Runner"
+          greeting: "Hello from"
+          
+      - name: Verify composite action
+        run: |
+          echo "=== Composite Action Test ==="
+          echo "Composite action executed successfully!"
+
+  # Multiple actions workflow
+  multiple-actions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: First checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Custom action step
+        run: |
+          echo "=== Custom Processing ==="
+          echo "Processing checked out files..."
+          echo "File count: $(find . -type f | wc -l)"
+          
+      - name: Second checkout with different config
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          path: secondary
+          
+      - name: Verify multiple checkouts
+        run: |
+          echo "=== Multiple Actions Verification ==="
+          echo "Primary checkout:"
+          ls -la | head -5
+          echo ""
+          echo "Secondary checkout:"
+          ls -la secondary/ | head -5
+          echo "✅ Multiple actions tested successfully!"

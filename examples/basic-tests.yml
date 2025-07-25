@@ -1,0 +1,53 @@
+name: Basic Tests
+on: [push]
+
+jobs:
+  # Basic environment and command testing
+  basic-commands:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello World
+        run: echo "Hello, World!"
+        
+      - name: Test basic commands and environment
+        run: |
+          echo "=== Environment Variables ==="
+          echo "Working directory: $(pwd)"
+          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_SHA: $GITHUB_SHA"
+          echo "RUNNER_OS: $RUNNER_OS"
+          echo "CI: $CI"
+          echo "GITHUB_ACTIONS: $GITHUB_ACTIONS"
+          echo ""
+          echo "=== Available Tools ==="
+          which git
+          which node
+          git --version
+          node --version
+          echo ""
+          echo "=== File Operations ==="
+          echo "Vermont Runner Test" > test.txt
+          cat test.txt
+          ls -la
+          echo "✅ Basic tests completed successfully!"
+
+  # Network connectivity testing
+  network-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test network connectivity
+        run: |
+          echo "=== Testing Network Connectivity ==="
+          echo "Checking DNS resolution:"
+          nslookup github.com
+          echo ""
+          echo "Testing HTTPS connectivity to GitHub:"
+          curl -I https://api.github.com
+          echo ""
+          echo "Testing git clone:"
+          git clone --depth 1 https://github.com/polatengin/vermont.git /tmp/test-clone
+          echo "Clone successful! Files in cloned repo:"
+          ls -la /tmp/test-clone | head -10
+          echo "✅ Network access is working!"

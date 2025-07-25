@@ -1,0 +1,117 @@
+name: CI Pipeline Demonstration
+on: [push, pull_request]
+
+env:
+  PROJECT_NAME: vermont
+  BUILD_VERSION: 1.0.0
+
+jobs:
+  # Setup and validation phase
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ env.BUILD_VERSION }}
+      commit-sha: ${GITHUB_SHA}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Setup environment
+        run: |
+          echo "=== CI Pipeline Setup ==="
+          echo "Project: ${PROJECT_NAME}"
+          echo "Version: ${BUILD_VERSION}"
+          echo "Commit: ${GITHUB_SHA}"
+          echo "Environment setup complete!"
+
+  # Build phase
+  build:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    strategy:
+      matrix:
+        go-version: ["1.21", "1.22"]
+        os: ["ubuntu-latest"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Setup Go ${{ matrix.go-version }}
+        run: |
+          echo "=== Build Phase ==="
+          echo "Setting up Go ${{ matrix.go-version }} on ${{ matrix.os }}"
+          echo "Building ${PROJECT_NAME} version ${{ needs.setup.outputs.version }}"
+          
+      - name: Build application
+        run: |
+          echo "=== Building Application ==="
+          echo "go build -o bin/${PROJECT_NAME} ./cmd/main.go"
+          echo "Build completed for Go ${{ matrix.go-version }}"
+
+  # Test phase
+  test:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    strategy:
+      matrix:
+        test-type: ["unit", "integration", "lint"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Run ${{ matrix.test-type }} tests
+        run: |
+          echo "=== ${{ matrix.test-type }} Tests ==="
+          case "${{ matrix.test-type }}" in
+            "unit")
+              echo "Running unit tests..."
+              echo "go test ./pkg/..."
+              ;;
+            "integration")
+              echo "Running integration tests..."
+              echo "go test -tags=integration ./..."
+              ;;
+            "lint")
+              echo "Running linting..."
+              echo "golangci-lint run"
+              ;;
+          esac
+          echo "${{ matrix.test-type }} tests completed"
+
+  # Deployment phase (conditional)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Deploy application
+        run: |
+          echo "=== Deployment Phase ==="
+          echo "Deploying ${PROJECT_NAME} version ${{ needs.setup.outputs.version }}"
+          echo "Commit: ${{ needs.setup.outputs.commit-sha }}"
+          echo "Environment: production"
+          echo "Deployment completed!"
+
+  # Notification phase
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Send notification
+        run: |
+          echo "=== Pipeline Notification ==="
+          if [[ "${{ needs.deploy.result }}" == "success" ]]; then
+            echo "✅ CI Pipeline completed successfully!"
+          else
+            echo "❌ CI Pipeline failed"
+          fi
+          echo "Project: ${PROJECT_NAME}"
+          echo "Status: ${{ needs.deploy.result }}"

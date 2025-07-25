@@ -1,0 +1,66 @@
+name: Checkout Tests
+on: [push]
+
+jobs:
+  # Simple checkout test
+  simple-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Initialize workspace
+        run: |
+          echo "=== Initializing Git Workspace ==="
+          git init
+          git config user.name "Vermont Runner"
+          git config user.email "vermont@example.com"
+          echo "Git workspace initialized"
+          
+      - name: Checkout repository  
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Verify checkout
+        run: |
+          echo "=== Checkout Results ==="
+          echo "Working directory: $(pwd)"
+          echo "Git status:"
+          git status
+          echo "Files in workspace:"
+          ls -la
+          if [ -f "README.md" ]; then
+            echo "✅ Checkout successful - README.md found!"
+            echo "First few lines of README:"
+            head -5 README.md
+          else
+            echo "❌ Checkout failed - README.md not found"
+          fi
+
+  # Checkout with different configurations
+  checkout-variations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Basic checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          
+      - name: Verify basic checkout
+        run: |
+          echo "=== Basic Checkout Verification ==="
+          echo "Repository files:"
+          ls -la
+          echo "Git log (last commit):"
+          git log -1 --oneline
+          
+      - name: Checkout with custom path
+        uses: actions/checkout@v4
+        with:
+          token: ${GITHUB_TOKEN}
+          path: custom-checkout
+          
+      - name: Verify custom path checkout
+        run: |
+          echo "=== Custom Path Checkout Verification ==="
+          echo "Contents of custom-checkout directory:"
+          ls -la custom-checkout/
+          echo "✅ Multiple checkout variations tested successfully!"

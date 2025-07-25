@@ -1,0 +1,69 @@
+name: Job Dependency Tests
+on: [push]
+
+jobs:
+  # Setup job
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup shared resources
+        run: |
+          echo "=== Setup Job ==="
+          echo "Setting up shared resources..."
+          echo "shared-data" > /tmp/shared.txt
+          echo "Setup completed!"
+
+  # Parallel jobs that depend on setup
+  test-a:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Test A
+        run: |
+          echo "=== Test A (depends on setup) ==="
+          echo "Running test A..."
+          sleep 2
+          echo "Test A completed!"
+
+  test-b:
+    runs-on: ubuntu-latest  
+    needs: setup
+    steps:
+      - name: Test B
+        run: |
+          echo "=== Test B (depends on setup) ==="
+          echo "Running test B..."
+          sleep 1
+          echo "Test B completed!"
+
+  # Job that depends on both test jobs
+  integration:
+    runs-on: ubuntu-latest
+    needs: [test-a, test-b]
+    steps:
+      - name: Integration tests
+        run: |
+          echo "=== Integration Tests (depends on test-a and test-b) ==="
+          echo "Running integration tests..."
+          echo "All dependencies completed successfully!"
+
+  # Final deployment job
+  deploy:
+    runs-on: ubuntu-latest
+    needs: integration
+    steps:
+      - name: Deploy
+        run: |
+          echo "=== Deploy (depends on integration) ==="
+          echo "Deploying application..."
+          echo "✅ Deployment completed successfully!"
+
+  # Independent parallel job
+  parallel-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Independent task
+        run: |
+          echo "=== Independent Parallel Job ==="
+          echo "This job runs in parallel with others"
+          echo "No dependencies required!"

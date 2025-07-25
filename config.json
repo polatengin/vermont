@@ -1,0 +1,20 @@
+{
+  "env": {
+    "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+    "GITHUB_REPOSITORY": "polatengin/vermont",
+    "GITHUB_WORKSPACE": "/workspace",
+    "GITHUB_ACTION": "vermont",
+    "GITHUB_ACTOR": "vermont-runner",
+    "GITHUB_EVENT_NAME": "push",
+    "GITHUB_REF": "refs/heads/main",
+    "GITHUB_SHA": "f356a3077add58c07c158d51fcab8608190f0ff6",
+    "RUNNER_OS": "Linux",
+    "RUNNER_ARCH": "X64",
+    "RUNNER_TEMP": "/tmp/runner",
+    "RUNNER_TOOL_CACHE": "/tmp/tool-cache",
+    "CI": "true",
+    "GITHUB_ACTIONS": "true",
+    "VERMONT_RUNNER": "true",
+    "NODE_ENV": "production"
+  }
+}

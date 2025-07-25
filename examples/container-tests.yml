@@ -1,0 +1,67 @@
+name: Container and Runner Tests
+on: [push]
+
+jobs:
+  # Ubuntu runner test
+  ubuntu-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Ubuntu environment
+        run: |
+          echo "=== Ubuntu Runner Test ==="
+          echo "OS Info:"
+          cat /etc/os-release
+          echo ""
+          echo "Available packages:"
+          which curl wget git node npm
+          echo ""
+          echo "Ubuntu environment ready!"
+
+  # Debian runner test  
+  debian-test:
+    runs-on: debian-latest
+    steps:
+      - name: Test Debian environment
+        run: |
+          echo "=== Debian Runner Test ==="
+          echo "OS Info:"
+          cat /etc/os-release
+          echo ""
+          echo "Package management:"
+          which apt-get
+          echo "Debian environment ready!"
+
+  # Alpine runner test
+  alpine-test:
+    runs-on: alpine-latest
+    steps:
+      - name: Test Alpine environment
+        run: |
+          echo "=== Alpine Runner Test ==="
+          echo "OS Info:"
+          cat /etc/os-release
+          echo ""
+          echo "Alpine Linux container:"
+          which apk
+          echo "Alpine package manager available"
+          echo "Alpine environment ready!"
+
+  # Custom container test
+  custom-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test container capabilities
+        run: |
+          echo "=== Container Capabilities Test ==="
+          echo "Container runtime info:"
+          uname -a
+          echo ""
+          echo "Memory info:"
+          free -h
+          echo ""
+          echo "Disk space:"
+          df -h
+          echo ""
+          echo "Network interfaces:"
+          ip addr show || ifconfig
+          echo "✅ Container tests completed!"

@@ -1,0 +1,64 @@
+name: Error Handling Tests
+on: [push]
+
+jobs:
+  # Test handling of command errors
+  command-error-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Successful command
+        run: echo "This should work fine"
+        
+      - name: Failing command (expected to fail)
+        run: |
+          echo "=== Testing Error Handling ==="
+          echo "About to run a failing command..."
+          false  # This will fail with exit code 1
+        continue-on-error: true
+        
+      - name: After error handling
+        run: |
+          echo "=== After Error ==="
+          echo "This step should still run due to continue-on-error"
+
+  # Test container execution errors
+  container-error-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invalid container command
+        run: |
+          echo "=== Container Error Test ==="
+          echo "Testing container error handling..."
+          command_that_does_not_exist || echo "Command failed as expected"
+          
+      - name: Container permission test
+        run: |
+          echo "=== Permission Test ==="
+          echo "Testing file operations..."
+          touch /tmp/test-file
+          echo "File creation successful"
+          rm /tmp/test-file
+          echo "File cleanup successful"
+
+  # Test missing dependency error
+  missing-dependency-error:
+    runs-on: ubuntu-latest
+    needs: [job-that-does-not-exist]
+    steps:
+      - name: This should not run
+        run: echo "This job should fail due to missing dependency"
+
+  # Test circular dependency (should be caught during validation)
+  circular-dep-a:
+    runs-on: ubuntu-latest
+    needs: [circular-dep-b]
+    steps:
+      - name: Circular A
+        run: echo "This would create a circular dependency"
+
+  circular-dep-b:
+    runs-on: ubuntu-latest  
+    needs: [circular-dep-a]
+    steps:
+      - name: Circular B
+        run: echo "This completes the circular dependency"

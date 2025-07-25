@@ -1,186 +1,186 @@
-# Vermont - AI Coding Agent Instructions
+# Vermont GitHub Actions Runner - AI Coding Instructions
 
-## Project Overview
-Vermont is a lightweight, Go-based GitHub Actions runner clone that executes GitHub Actions workflows locally or in containers. It's designed to be a self-contained alternative to GitHub's hosted runners with focus on performance, compatibility, and ease of use.
+Vermont is a **local GitHub Actions runner** written in Go that executes workflows in Docker containers with full dependency management and parallel execution support.
 
-## Architecture & Core Components
+## Architecture Overview
 
-### 🏗️ **Main Components**
-- **`cmd/main.go`** - CLI interface with `vermont run` and `vermont validate` commands
-- **`pkg/workflow/`** - YAML workflow parsing, validation, and data structures 
-- **`pkg/executor/`** - Core execution engine with job scheduling and dependency management
-- **`pkg/container/`** - Docker container management with automatic image building
-- **`pkg/actions/`** - GitHub Actions marketplace integration and execution
-- **`pkg/storage/`** - Storage abstraction layer (currently placeholder for future expansion)
-- **`internal/config/`** - Configuration management for runner, container, actions, storage, and logging settings
-- **`internal/logger/`** - Structured logging throughout the application
-- **`runners/`** - Dockerfiles for various OS variants (Ubuntu, Debian, Alpine, CentOS)
+Vermont has evolved from single-file to a **structured package-based architecture**:
+- **Entry Point**: `cmd/main.go` - CLI with `vermont <workflow-file>` interface
+- **Core Packages**: `pkg/{workflow,executor,actions,container}` for modular functionality
+- **Configuration**: JSON-based environment management with `${VAR}` shell expansion
+- **Execution Model**: Dependency-aware job scheduling with Docker containerization
 
-### 🔄 **Execution Flow**
-```
-CLI → Workflow Parser → Job Scheduler → Dependency Validation → Parallel Execution → Step Executor → Container Execution
+## Key Components & Data Flow
+
+### 1. Workflow Processing (`pkg/workflow/`)
+```go
+// Workflow parsing with matrix expansion and validation
+Workflow → Jobs → Matrix Expansion → Job Dependencies → Execution Queue
 ```
 
-### 🧬 **Key Data Structures**
-- **`Workflow`** - Top-level workflow with jobs, triggers, and global settings
-- **`Job`** - Individual job with steps, dependencies (`needs`), matrix strategy, and execution context
-- **`Step`** - Single execution unit with `run` commands or `uses` actions
-- **`JobScheduler`** - Manages job dependencies, parallel execution, and state tracking
-- **`JobState`** - Tracks individual job status (Pending → Ready → Running → Completed/Failed)
-- **`MatrixCombination`** - Represents matrix strategy variable combinations for job expansion
-
-## 🚀 **Key Features & Implementation**
-
-### Job Dependency Management & Parallel Execution
-- **Dependency Resolution**: Topological sort with circular dependency detection
-- **Parallel Execution**: Goroutine-based concurrent job execution with semaphore limits
-- **State Management**: Job state tracking with dependency completion monitoring
-- **Error Handling**: Deadlock detection and proper error propagation
-- **Matrix Build Support**: Automatic job expansion from matrix strategies with multi-dimensional combinations
-
-### GitHub Actions Marketplace Integration
-- **Action Management**: Download, cache, and version actions from GitHub repositories
-- **Action Types**: Composite actions, Node.js actions (placeholder), Docker actions (placeholder)
-- **Template Processing**: Handle `${{ inputs.name }}` expressions and GitHub Actions syntax
-- **Environment Setup**: Proper INPUT_* environment variable mapping for actions
-
-### Container Execution
-- **Automatic Building**: Just-in-time building of Vermont runner images from `runners/` directory
-- **Image Management**: Intelligent image detection, pulling, and building
-- **Multi-OS Support**: Ubuntu, Debian, Alpine, CentOS variants with full development toolchains
-- **Shell Detection**: Automatic shell selection (bash for Ubuntu/Debian, sh for Alpine)
-
-### Step Execution Engine
-- **Command Execution**: Shell command execution with proper error handling
-- **Environment Variables**: Job-level, step-level, and system environment inheritance
-- **Container Integration**: Consistent container-based execution for all steps
-- **Output Management**: Real-time output streaming and structured logging
-
-## 🛠️ **Development Patterns & Conventions**
-
-### Go Patterns Used
-- **Worker Pool Pattern**: Job scheduler with configurable concurrency limits
-- **Context Propagation**: Proper context usage for cancellation and timeouts
-- **Structured Logging**: Consistent logging with key-value pairs across all components
-- **Dependency Injection**: Clean separation of concerns with interface-based design
-- **Error Wrapping**: Proper error context with `fmt.Errorf` and `%w` verb
-
-### Project Structure Conventions
-```
-pkg/          - Public APIs and core functionality
-internal/     - Private packages (config, logger, utils)
-cmd/          - CLI applications and main entry points
-runners/      - Container dockerfiles organized by OS variant
-examples/     - Comprehensive workflow examples for testing
+### 2. Job Execution (`pkg/executor/`)
+```go
+// Parallel execution with dependency management
+JobScheduler → Dependency Validation → Parallel Execution → Container Management
 ```
 
-### Configuration Management
-- **JSON Configuration**: Structured config with runner, container, actions, logging sections
-- **Environment Override**: Runtime configuration through environment variables
-- **Default Values**: Sensible defaults for development and production use
+### 3. Container Management (`pkg/container/`)
+```go
+// Docker-based step execution with runner images
+Manager.RunStep() → Docker Pull → Container Execution → Result Collection
+```
 
-### Testing Strategy
-- **Example Workflows**: Comprehensive test workflows in `examples/` directory
-- **Integration Testing**: End-to-end workflow execution testing
-- **Error Scenarios**: Dedicated error handling and edge case testing
-- **Container Testing**: Multi-OS container execution validation
+### 4. GitHub Actions Support (`pkg/actions/`)
+```go
+// Full GitHub Actions compatibility
+Execute() → {Node.js, Docker, Composite} Action Types → Template Processing
+```
 
-## 🔧 **Development Guidelines**
+## Critical Development Patterns
 
-### When Adding New Features
-1. **Follow the Component Pattern**: Each major feature should have its own package under `pkg/`
-2. **Use Structured Logging**: Always log with context using the logger with key-value pairs
-3. **Handle Errors Properly**: Wrap errors with context, never ignore error returns
-4. **Write Integration Tests**: Add example workflows to test new functionality
-5. **Update Documentation**: Keep README.md and this file updated with new features
+### 1. Container-First Execution
+All steps execute in Docker containers with automatic image building:
+```bash
+# Auto-built from runners/Dockerfile.<runner-name>
+"ubuntu-latest" → "vermont-runner:ubuntu-latest"
+```
 
-### Code Quality Standards
-- **Linting**: Must pass `make lint` with zero issues (errcheck, staticcheck, go vet)
-- **Error Handling**: All error returns must be checked and handled appropriately
-- **Context Usage**: Use context.Context for cancellation and timeout handling
-- **Interface Design**: Prefer interfaces for testability and loose coupling
+### 2. Environment Variable System
+```go
+// config.json with shell expansion - NO hardcoded defaults
+"GITHUB_TOKEN": "${GITHUB_TOKEN}"  // Expands from environment
+"GITHUB_SHA": "actual-commit-hash"  // Direct configuration values
+```
 
-### Container Integration Guidelines
-- **Image Naming**: Follow `vermont-runner-<os>-<version>` pattern for custom images
-- **Dockerfile Location**: All runner dockerfiles in `runners/` directory
-- **Automatic Building**: Images should build automatically when referenced
-- **Shell Compatibility**: Test with both bash and sh shells for cross-OS compatibility
+### 3. Matrix Strategy Implementation
+```go
+// Matrix jobs expand into discrete jobs with template substitution
+"test" with 2x3 matrix → "test-0", "test-1", ..., "test-5"
+// Uses ${{ matrix.* }} template replacement
+```
 
-### GitHub Actions Integration
-- **Action Caching**: Cache downloaded actions in `~/.vermont/actions/` directory
-- **Template Processing**: Handle all GitHub Actions expressions and syntax
-- **Input Validation**: Validate required inputs and provide meaningful error messages
-- **Environment Setup**: Properly map inputs to INPUT_* environment variables
+### 4. Dependency Management
+```go
+// Real dependency resolution with cycle detection and parallel execution
+JobScheduler.validateDependencies() → Topological sort → Parallel execution
+```
 
-## 🎯 **Common Development Tasks**
+## Development Workflows
 
-### Adding a New Workflow Feature
-1. Update `pkg/workflow/workflow.go` with new YAML structures
-2. Extend parser validation in `workflow.go`
-3. Update executor logic in `pkg/executor/executor.go`
-4. Add example workflow in `examples/`
-5. Test with `make dev-run FILE=examples/your-test.yml` or `make dev-exec ARGS="run examples/your-test.yml"`
+### Quick Testing & Debugging
+```bash
+# Development mode (no compilation)
+go run ./cmd/main.go examples/basic-tests.yml
 
-### Adding Container Support for New OS
-1. Create `runners/Dockerfile.<os>-<version>` with development toolchain
-2. Update `pkg/container/manager.go` dockerfile mapping
-3. Test automatic building with workflow using new OS
+# Container debugging
+docker images | grep vermont-runner
+docker run -it vermont-runner:ubuntu-latest bash
 
-### Debugging Execution Issues
-- Use `make dev-exec ARGS="run examples/your-workflow.yml -v"` for verbose logging
-- Use `make dev-run FILE=examples/your-workflow.yml` for quick testing without compilation
-- Check container logs for container execution issues
-- Verify action downloads in `~/.vermont/actions/` cache directory
-- Use structured logging to trace execution flow
+# Dependency debugging - check job execution order
+go run ./cmd/main.go examples/dependency-tests.yml -v
+```
 
-### Performance Optimization
-- Adjust `MaxConcurrentJobs` in configuration for parallel execution tuning
-- Use container reuse strategies for multiple steps
-- Implement action caching optimizations
-- Profile goroutine usage for job scheduling bottlenecks
+### Action Development & Testing
+```bash
+# Test GitHub Actions integration
+go run ./cmd/main.go examples/checkout-tests.yml
 
-## 🚨 **Common Pitfalls & Solutions**
+# Test local composite actions
+go run ./cmd/main.go examples/actions-tests.yml
 
-### Error Handling
-- **Never ignore errors**: Always check and handle error returns
-- **Provide context**: Use `fmt.Errorf("operation failed: %w", err)` for error wrapping
-- **Log before returning**: Log errors with context before returning them
+# Test matrix strategies
+go run ./cmd/main.go examples/matrix-tests.yml
+```
 
-### Container Execution
-- **Docker availability**: Always check `IsDockerAvailable()` before container operations
-- **Image building**: Expect automatic building for Vermont runner images
-- **Shell differences**: Test with both bash (Ubuntu/Debian) and sh (Alpine) shells
+## Project-Specific Conventions
 
-### Job Dependencies
-- **Circular dependencies**: Validate dependency graphs to prevent deadlocks
-- **Missing jobs**: Ensure all `needs` references point to existing jobs
-- **Parallel limits**: Configure appropriate `MaxConcurrentJobs` for system resources
+### 1. Error Handling Pattern
+```go
+// Structured logging with context and error wrapping
+logger.Error("Action execution failed", "job", jobID, "step", stepNum, "error", err)
+return fmt.Errorf("step %d (action %s) failed: %w", stepNum, step.Uses, err)
+```
 
-### GitHub Actions Integration
-- **Action compatibility**: Focus on composite actions first, Node.js/Docker are placeholders
-- **Input handling**: Convert between YAML `with` and environment `INPUT_*` variables
-- **Template processing**: Handle all `${{ }}` expressions in action inputs and commands
+### 2. Container Execution Pattern
+```go
+// Always use --network host for GitHub operations
+dockerArgs := []string{"run", "--rm", "--network", "host", ...}
+```
 
-## 📚 **Reference Information**
+### 3. Template Processing
+```go
+// Multiple template contexts: matrix, inputs, step outputs
+substituteMatrixVars(text, matrixVars)         // ${{ matrix.* }}
+substituteActionTemplates(text, inputs, ...)   // ${{ inputs.* }}, ${{ steps.*.outputs.* }}
+```
 
-### Key Configuration Files
-- **`example-configs/config.json`** - Container execution configuration
-- **`Makefile`** - Development tasks and build targets
+### 4. Workspace Isolation
+```go
+// Job-specific workspace directories
+jobWorkDir := fmt.Sprintf("%s-%s", config.Runner.WorkDir, jobID)
+```
 
-### Important Example Workflows
-- **`examples/simple-test.yml`** - Basic command execution
-- **`examples/dependency-test.yml`** - Job dependency testing
-- **`examples/parallel-test.yml`** - Parallel execution testing
-- **`examples/actions-demo.yml`** - GitHub Actions marketplace integration
-- **`examples/container-test.yml`** - Container execution testing
-- **`examples/matrix-demo.yml`** - Matrix build strategy demonstrations
+## Integration Points
 
-### Build & Development
-- **`make build`** - Build the Vermont binary
-- **`make dev-run FILE=<workflow>`** - Run workflow with go run (no compilation needed)
-- **`make dev-validate FILE=<workflow>`** - Validate workflow with go run
-- **`make dev-exec ARGS="run <workflow>"`** - Execute workflow in development
-- **`make lint`** - Run code quality checks
-- **`make test`** - Run test suite
+### GitHub Actions Compatibility
+- **Action Types**: Composite, Node.js, Docker actions with full marketplace support
+- **Template System**: Complete `${{ }}` syntax with context-aware substitution
+- **Environment Files**: GITHUB_OUTPUT, GITHUB_STEP_SUMMARY standard support
+- **Network Access**: `--network host` for repository cloning and external services
 
-This documentation should guide AI agents to understand Vermont's architecture, maintain code quality, and extend functionality effectively while following established patterns and conventions.
+### Docker Integration
+- **Image Management**: Auto-building from `runners/Dockerfile.*` with caching
+- **Volume Mounting**: Workspace isolation with proper permission handling
+- **Output Capture**: Combined stdout/stderr with structured logging
+
+### Configuration System
+- **Environment Expansion**: `${VAR}` syntax with fallback to shell environment
+- **Structured Config**: JSON-based with validation and type safety
+- **Runtime Context**: Dynamic GitHub Actions environment variable injection
+
+## Key Architecture Decisions
+
+### 1. Package Structure Evolution
+```go
+// Evolved from main.go monolith to structured packages
+cmd/main.go           // CLI entry point
+pkg/workflow/         // YAML parsing, matrix expansion, validation
+pkg/executor/         // Job scheduling, parallel execution
+pkg/actions/          // GitHub Actions execution (Node.js, Docker, Composite)
+pkg/container/        // Docker management, image building
+internal/config/      // Configuration management
+internal/logger/      // Structured logging
+```
+
+### 2. Execution Model
+- **Dependency-aware**: Real topological sorting with cycle detection
+- **Parallel execution**: Configurable concurrency with semaphore control
+- **Container isolation**: Every step runs in Docker for consistency
+- **Error handling**: Fail-fast with detailed context logging
+
+### 3. GitHub Actions Integration
+- **Full compatibility**: Supports marketplace actions, local actions, composite actions
+- **Template processing**: Complete `${{ }}` expression evaluation
+- **Environment context**: Proper GitHub Actions environment variable setup
+
+## Testing Strategy
+
+Use consolidated examples for comprehensive testing:
+```bash
+# Test core functionality
+go run ./cmd/main.go examples/basic-tests.yml
+
+# Test GitHub integration (requires GITHUB_TOKEN in config.json)
+go run ./cmd/main.go examples/checkout-tests.yml
+
+# Test parallel job execution and dependencies
+go run ./cmd/main.go examples/dependency-tests.yml
+
+# Test error handling and edge cases
+go run ./cmd/main.go examples/error-tests.yml
+
+# Test complex CI pipeline scenarios
+go run ./cmd/main.go examples/ci-pipeline-demo.yml
+```
+
+When modifying Vermont, always test against multiple examples to ensure compatibility across the full feature set, especially dependency resolution and container execution patterns.
