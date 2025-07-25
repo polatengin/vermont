@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ func (m *Manager) RunStep(ctx context.Context, step *workflow.Step, image string
 		"--rm",
 		"--name", containerID,
 		"--workdir", "/workspace",
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 	}
 
 	// Add environment variables

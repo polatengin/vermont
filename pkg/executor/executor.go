@@ -78,13 +78,18 @@ func New(cfg *config.Config, log *logger.Logger) *Executor {
 	actionManager := actions.NewManager(cfg, log)
 	actionExecutor := actions.NewExecutor(actionManager, log)
 
-	return &Executor{
+	executor := &Executor{
 		config:           cfg,
 		logger:           log,
 		containerManager: container.NewManager(cfg, log),
 		actionManager:    actionManager,
 		actionExecutor:   actionExecutor,
 	}
+
+	// Ensure work directory exists and has proper permissions
+	executor.ensureWorkDirectory()
+
+	return executor
 }
 
 // Execute executes a workflow with dependency management and parallel execution
@@ -565,6 +570,29 @@ func (e *Executor) createJobEnvironment(jobID string, job *workflow.Job) map[str
 	}
 
 	return env
+}
+
+// ensureWorkDirectory ensures the work directory exists and has proper permissions
+func (e *Executor) ensureWorkDirectory() {
+	workDir := e.config.Runner.WorkDir
+	if workDir == "" {
+		return
+	}
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		e.logger.Warn("Failed to create work directory", "dir", workDir, "error", err)
+		return
+	}
+
+	// Try to make it writable by the current user
+	// This is a best-effort attempt - container execution might still fail
+	// if the container user has a different UID
+	if err := os.Chmod(workDir, 0755); err != nil {
+		e.logger.Warn("Failed to set work directory permissions", "dir", workDir, "error", err)
+	}
+
+	e.logger.Debug("Work directory ensured", "dir", workDir)
 }
 
 // shouldUseContainer determines if a job should run in a container
