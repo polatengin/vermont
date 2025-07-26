@@ -26,7 +26,8 @@ RUN dnf update -y && \
         tar \
         gzip \
         unzip \
-        openssl-devel
+        openssl-devel \
+        iproute
 
 # Create runner user after sudo is installed
 RUN useradd -m -s /bin/bash runner && \

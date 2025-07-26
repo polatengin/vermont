@@ -8,7 +8,7 @@ env:
 jobs:
   # Setup and validation phase
   setup:
-    runs-on: ubuntu-latest
+    runs-on: custom-latest
     outputs:
       version: ${{ env.BUILD_VERSION }}
       commit-sha: ${GITHUB_SHA}

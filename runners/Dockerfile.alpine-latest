@@ -22,7 +22,8 @@ RUN apk update && \
         linux-headers \
         openssl-dev \
         bash \
-        shadow
+        shadow \
+        iproute2
 
 # Create runner user after sudo is installed
 RUN adduser -D -s /bin/bash runner && \
