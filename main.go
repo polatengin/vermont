@@ -426,7 +426,7 @@ func substituteActionTemplates(text string, inputs map[string]interface{}, stepO
 }
 
 // substituteWorkflowTemplates replaces workflow context template variables with safe defaults
-func substituteWorkflowTemplates(text string, workflowEnv map[string]string) string {
+func substituteWorkflowTemplates(text string, workflowEnv map[string]string, configEnv map[string]string) string {
 	result := text
 
 	// Handle workflow environment variables: ${{ env.VAR }}
@@ -450,6 +450,7 @@ func substituteWorkflowTemplates(text string, workflowEnv map[string]string) str
 
 		// Extract the template expression
 		templateExpr := result[start:end]
+		templateContent := strings.TrimSpace(templateExpr[3 : len(templateExpr)-2]) // Remove ${{ and }}
 
 		// Provide safe defaults for common patterns
 		var replacement string
@@ -460,9 +461,67 @@ func substituteWorkflowTemplates(text string, workflowEnv map[string]string) str
 		case strings.Contains(templateExpr, "needs.") && strings.Contains(templateExpr, ".outputs."):
 			// Job output expressions: default to "unknown"
 			replacement = "unknown"
-		case strings.Contains(templateExpr, "github.ref"):
-			// GitHub ref expressions: default to main branch
-			replacement = "refs/heads/main"
+		case templateContent == "github.repository":
+			// GitHub repository: use the configured repository
+			replacement = configEnv["GITHUB_REPOSITORY"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_REPOSITORY")
+			}
+			if replacement == "" {
+				replacement = "owner/repo" // fallback
+			}
+		case templateContent == "github.token":
+			// GitHub token: use the configured token
+			replacement = configEnv["GITHUB_TOKEN"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_TOKEN")
+			}
+		case templateContent == "github.ref":
+			// GitHub ref: use the configured ref
+			replacement = configEnv["GITHUB_REF"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_REF")
+			}
+			if replacement == "" {
+				replacement = "refs/heads/main" // fallback
+			}
+		case templateContent == "github.sha":
+			// GitHub SHA: use the configured SHA
+			replacement = configEnv["GITHUB_SHA"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_SHA")
+			}
+			if replacement == "" {
+				replacement = "unknown" // fallback
+			}
+		case templateContent == "github.workspace":
+			// GitHub workspace: use the configured workspace
+			replacement = configEnv["GITHUB_WORKSPACE"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_WORKSPACE")
+			}
+			if replacement == "" {
+				replacement = "/workspace" // fallback
+			}
+		case templateContent == "github.token":
+			// GitHub token: use the configured token
+			replacement = configEnv["GITHUB_TOKEN"]
+			if replacement == "" {
+				replacement = os.Getenv("GITHUB_TOKEN")
+			}
+			if replacement == "" {
+				replacement = "github_pat_placeholder" // fallback
+			}
+		case strings.HasPrefix(templateContent, "github."):
+			// Other GitHub context variables: try config first, then environment variable
+			envVar := strings.ToUpper(strings.ReplaceAll(templateContent, ".", "_"))
+			replacement = configEnv[envVar]
+			if replacement == "" {
+				replacement = os.Getenv(envVar)
+			}
+			if replacement == "" {
+				replacement = "unknown" // fallback
+			}
 		case strings.Contains(templateExpr, "env."):
 			// Environment variables: extract name and use empty default
 			replacement = ""
@@ -720,6 +779,38 @@ func executeCompositeAction(actionMeta interface{}, step *Step, jobDir, runnerIm
 		}
 	}
 
+	// Set default values for inputs not provided in step.With
+	providedInputs := make(map[string]bool)
+	if step.With != nil {
+		for inputName := range step.With {
+			providedInputs[inputName] = true
+		}
+	}
+
+	// Add defaults from action metadata
+	for inputName, inputSpec := range meta.Inputs {
+		if !providedInputs[inputName] {
+			defaultValue := inputSpec.Default
+			// Special handling for common GitHub Actions defaults
+			if inputName == "token" && defaultValue == "" {
+				// Checkout action and many others expect GITHUB_TOKEN as default
+				defaultValue = "${GITHUB_TOKEN}"
+			}
+			if inputName == "github-token" && defaultValue == "" {
+				// GitHub script action and others expect GITHUB_TOKEN as default
+				defaultValue = "${GITHUB_TOKEN}"
+			}
+			if defaultValue != "" {
+				expandedValue := expandEnvironmentVariables(defaultValue)
+				// Also process workflow templates for default values
+				expandedValue = substituteWorkflowTemplates(expandedValue, make(map[string]string), config.Env)
+				envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
+				actionEnv[envName] = expandedValue
+				inputs[inputName] = expandedValue
+			}
+		}
+	}
+
 	// Track step outputs
 	stepOutputs := make(map[string]map[string]string)
 
@@ -818,6 +909,37 @@ func executeNodeAction(actionMeta interface{}, step *Step, jobDir, runnerImage s
 			expandedValue := expandEnvironmentVariables(fmt.Sprintf("%v", value))
 			envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
 			env = append(env, "-e", fmt.Sprintf("%s=%s", envName, expandedValue))
+		}
+	}
+
+	// Set default values for inputs not provided in step.With
+	providedInputs := make(map[string]bool)
+	if step.With != nil {
+		for inputName := range step.With {
+			providedInputs[inputName] = true
+		}
+	}
+
+	// Add defaults from action metadata
+	for inputName, inputSpec := range meta.Inputs {
+		if !providedInputs[inputName] {
+			defaultValue := inputSpec.Default
+			// Special handling for common GitHub Actions defaults
+			if inputName == "token" && defaultValue == "" {
+				// Checkout action and many others expect GITHUB_TOKEN as default
+				defaultValue = "${GITHUB_TOKEN}"
+			}
+			if inputName == "github-token" && defaultValue == "" {
+				// GitHub script action and others expect GITHUB_TOKEN as default
+				defaultValue = "${GITHUB_TOKEN}"
+			}
+			if defaultValue != "" {
+				expandedValue := expandEnvironmentVariables(defaultValue)
+				// Also process workflow templates for default values
+				expandedValue = substituteWorkflowTemplates(expandedValue, make(map[string]string), config.Env)
+				envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
+				env = append(env, "-e", fmt.Sprintf("%s=%s", envName, expandedValue))
+			}
 		}
 	}
 
@@ -1181,7 +1303,7 @@ func executeJobSteps(job *Job, jobDir, runnerImage string, config *Config, steps
 
 func executeRunStep(step *Step, jobDir, runnerImage string, config *Config, workflowEnv map[string]string) error {
 	// Process workflow templates in the run command
-	processedRun := substituteWorkflowTemplates(step.Run, workflowEnv)
+	processedRun := substituteWorkflowTemplates(step.Run, workflowEnv, config.Env)
 
 	// Prepare environment variables
 	env := make([]string, 0)
