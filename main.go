@@ -26,10 +26,34 @@ type Workflow struct {
 	Env  map[string]string `yaml:"env,omitempty"`
 }
 
+// JobNeeds represents the needs field that can be either a string or []string
+type JobNeeds []string
+
+// UnmarshalYAML implements custom unmarshaling for JobNeeds
+func (jn *JobNeeds) UnmarshalYAML(value *yaml.Node) error {
+	// Handle single string case
+	if value.Kind == yaml.ScalarNode {
+		*jn = []string{value.Value}
+		return nil
+	}
+
+	// Handle array case
+	if value.Kind == yaml.SequenceNode {
+		var needs []string
+		if err := value.Decode(&needs); err != nil {
+			return err
+		}
+		*jn = needs
+		return nil
+	}
+
+	return fmt.Errorf("needs must be either a string or an array of strings")
+}
+
 // Job represents a single job in a workflow
 type Job struct {
 	RunsOn      interface{}       `yaml:"runs-on"`
-	Needs       []string          `yaml:"needs"`
+	Needs       JobNeeds          `yaml:"needs"`
 	Steps       []*Step           `yaml:"steps"`
 	Strategy    *Strategy         `yaml:"strategy"`
 	If          string            `yaml:"if,omitempty"`
@@ -927,31 +951,125 @@ func executeJobs(jobs map[string]*Job, config *Config, pipelineDir string, workf
 		return fmt.Errorf("failed to create steps directory: %w", err)
 	}
 
-	// Simple execution for now - we'll implement dependency resolution later
-	for jobName, job := range jobs {
-		fmt.Printf("Job: %s\n", jobName)
-		fmt.Printf("  Runs on: %v\n", job.RunsOn)
-		fmt.Printf("  Steps: %d\n", len(job.Steps))
+	// Build dependency graph and execute jobs with proper dependency resolution
+	return executeJobsWithDependencies(jobs, config, pipelineDir, stepsDir, workflowEnv)
+}
 
-		// Create job directory
-		jobDir := filepath.Join(pipelineDir, jobName)
-		if err := os.MkdirAll(jobDir, 0755); err != nil {
-			return fmt.Errorf("failed to create job directory: %w", err)
+func executeJobsWithDependencies(jobs map[string]*Job, config *Config, pipelineDir, stepsDir string, workflowEnv map[string]string) error {
+	// Validate dependencies
+	if err := validateJobDependencies(jobs); err != nil {
+		return fmt.Errorf("dependency validation failed: %w", err)
+	}
+
+	// Track job completion status
+	completed := make(map[string]bool)
+	inProgress := make(map[string]bool)
+	results := make(chan JobResult, len(jobs))
+
+	// Start executing jobs
+	for len(completed) < len(jobs) {
+		// Find jobs that can be executed (all dependencies completed)
+		readyJobs := findReadyJobs(jobs, completed, inProgress)
+
+		if len(readyJobs) == 0 {
+			if len(inProgress) == 0 {
+				return fmt.Errorf("circular dependency detected or no executable jobs remaining")
+			}
+			// Wait for a job to complete
+			result := <-results
+			inProgress[result.JobName] = false
+			completed[result.JobName] = true
+			if result.Error != nil {
+				return fmt.Errorf("job %s failed: %w", result.JobName, result.Error)
+			}
+			continue
 		}
 
-		// Get runner image
-		runnerImage, err := getRunnerImage(job.RunsOn)
-		if err != nil {
-			return fmt.Errorf("failed to get runner image: %w", err)
+		// Execute ready jobs in parallel
+		for _, jobName := range readyJobs {
+			inProgress[jobName] = true
+			go func(jobName string, job *Job) {
+				result := JobResult{JobName: jobName}
+				result.Error = executeJobSync(jobName, job, config, pipelineDir, stepsDir, workflowEnv)
+				results <- result
+			}(jobName, jobs[jobName])
 		}
 
-		// Execute steps in container
-		if err := executeJobSteps(job, jobDir, runnerImage, config, stepsDir, workflowEnv); err != nil {
-			return fmt.Errorf("job %s failed: %w", jobName, err)
+		// Wait for at least one job to complete before checking for more ready jobs
+		if len(readyJobs) > 0 {
+			result := <-results
+			inProgress[result.JobName] = false
+			completed[result.JobName] = true
+			if result.Error != nil {
+				return fmt.Errorf("job %s failed: %w", result.JobName, result.Error)
+			}
 		}
 	}
 
 	return nil
+}
+
+type JobResult struct {
+	JobName string
+	Error   error
+}
+
+func validateJobDependencies(jobs map[string]*Job) error {
+	for jobName, job := range jobs {
+		for _, dep := range job.Needs {
+			if _, exists := jobs[dep]; !exists {
+				return fmt.Errorf("job %s depends on non-existent job %s", jobName, dep)
+			}
+		}
+	}
+	return nil
+}
+
+func findReadyJobs(jobs map[string]*Job, completed, inProgress map[string]bool) []string {
+	var ready []string
+
+	for jobName, job := range jobs {
+		// Skip if already completed or in progress
+		if completed[jobName] || inProgress[jobName] {
+			continue
+		}
+
+		// Check if all dependencies are completed
+		allDepsCompleted := true
+		for _, dep := range job.Needs {
+			if !completed[dep] {
+				allDepsCompleted = false
+				break
+			}
+		}
+
+		if allDepsCompleted {
+			ready = append(ready, jobName)
+		}
+	}
+
+	return ready
+}
+
+func executeJobSync(jobName string, job *Job, config *Config, pipelineDir, stepsDir string, workflowEnv map[string]string) error {
+	fmt.Printf("Job: %s\n", jobName)
+	fmt.Printf("  Runs on: %v\n", job.RunsOn)
+	fmt.Printf("  Steps: %d\n", len(job.Steps))
+
+	// Create job directory
+	jobDir := filepath.Join(pipelineDir, jobName)
+	if err := os.MkdirAll(jobDir, 0755); err != nil {
+		return fmt.Errorf("failed to create job directory: %w", err)
+	}
+
+	// Get runner image
+	runnerImage, err := getRunnerImage(job.RunsOn)
+	if err != nil {
+		return fmt.Errorf("failed to get runner image: %w", err)
+	}
+
+	// Execute steps in container
+	return executeJobSteps(job, jobDir, runnerImage, config, stepsDir, workflowEnv)
 }
 
 func getRunnerImage(runsOn interface{}) (string, error) {
