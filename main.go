@@ -546,7 +546,7 @@ func parseActionRef(uses string) (*ActionRef, error) {
 }
 
 // cloneAction clones an action repository to the steps directory or resolves local path
-func cloneAction(actionRef *ActionRef, stepsDir string) (string, error) {
+func cloneAction(actionRef *ActionRef, stepsDir string, jobDir string) (string, error) {
 	// Handle local actions
 	if actionRef.IsLocal {
 		// Get absolute path relative to current working directory
@@ -565,8 +565,9 @@ func cloneAction(actionRef *ActionRef, stepsDir string) (string, error) {
 		return actionDir, nil
 	}
 
-	// Handle remote actions
-	actionDir := filepath.Join(stepsDir, fmt.Sprintf("%s_%s_%s", actionRef.Owner, actionRef.Repo, actionRef.Ref))
+	// Handle remote actions - make unique per job to avoid race conditions
+	jobName := filepath.Base(jobDir)
+	actionDir := filepath.Join(stepsDir, fmt.Sprintf("%s_%s_%s_%s", actionRef.Owner, actionRef.Repo, actionRef.Ref, jobName))
 
 	// Check if already cloned
 	if _, err := os.Stat(actionDir); err == nil {
@@ -618,7 +619,7 @@ func executeAction(step *Step, jobDir, runnerImage string, config *Config, steps
 	}
 
 	// Clone action
-	actionDir, err := cloneAction(actionRef, stepsDir)
+	actionDir, err := cloneAction(actionRef, stepsDir, jobDir)
 	if err != nil {
 		return fmt.Errorf("failed to clone action: %w", err)
 	}
