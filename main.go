@@ -522,6 +522,9 @@ func substituteWorkflowTemplates(text string, workflowEnv map[string]string, con
 			if replacement == "" {
 				replacement = "unknown" // fallback
 			}
+		case strings.Contains(templateContent, "runner.debug"):
+			// Runner debug expressions: default to "false" for boolean compatibility
+			replacement = "false"
 		case strings.Contains(templateExpr, "env."):
 			// Environment variables: extract name and use empty default
 			replacement = ""
@@ -897,9 +900,29 @@ func executeNodeAction(actionMeta interface{}, step *Step, jobDir, runnerImage s
 	// Prepare environment with input variables
 	env := make([]string, 0)
 
-	// Add config environment variables (these should include all required GitHub Actions variables)
+	// First, collect all input names that user explicitly provided
+	userProvidedInputs := make(map[string]bool)
+	if step.With != nil {
+		for inputName := range step.With {
+			envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(inputName))
+			userProvidedInputs[envName] = true
+		}
+	}
+
+	// Add config environment variables (skip ones that user will override)
+	configKeys := make([]string, 0, len(config.Env))
+	for key := range config.Env {
+		if !userProvidedInputs[key] {
+			configKeys = append(configKeys, key)
+		}
+	}
+	fmt.Printf("DEBUG Config env keys (after filtering user inputs): %v\n", configKeys)
 	for key, value := range config.Env {
-		env = append(env, "-e", fmt.Sprintf("%s=%s", key, value))
+		if !userProvidedInputs[key] {
+			env = append(env, "-e", fmt.Sprintf("%s=%s", key, value))
+		} else {
+			fmt.Printf("DEBUG Config: Skipping %s (will be overridden by user input)\n", key)
+		}
 	}
 
 	// Set inputs from step.With
@@ -907,6 +930,8 @@ func executeNodeAction(actionMeta interface{}, step *Step, jobDir, runnerImage s
 		for inputName, value := range step.With {
 			// Expand environment variables in the value
 			expandedValue := expandEnvironmentVariables(fmt.Sprintf("%v", value))
+			// Also expand workflow templates like ${{ github.token }}
+			expandedValue = substituteWorkflowTemplates(expandedValue, make(map[string]string), config.Env)
 			envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
 			env = append(env, "-e", fmt.Sprintf("%s=%s", envName, expandedValue))
 		}
@@ -922,8 +947,11 @@ func executeNodeAction(actionMeta interface{}, step *Step, jobDir, runnerImage s
 
 	// Add defaults from action metadata
 	for inputName, inputSpec := range meta.Inputs {
+		fmt.Printf("DEBUG Defaults: checking input '%s', providedInputs[%s] = %v\n", inputName, inputName, providedInputs[inputName])
 		if !providedInputs[inputName] {
 			defaultValue := inputSpec.Default
+			fmt.Printf("DEBUG Action: %s input %s default: '%s'\n", step.Uses, inputName, defaultValue)
+
 			// Special handling for common GitHub Actions defaults
 			if inputName == "token" && defaultValue == "" {
 				// Checkout action and many others expect GITHUB_TOKEN as default
@@ -933,17 +961,86 @@ func executeNodeAction(actionMeta interface{}, step *Step, jobDir, runnerImage s
 				// GitHub script action and others expect GITHUB_TOKEN as default
 				defaultValue = "${GITHUB_TOKEN}"
 			}
+
+			// For required inputs, we need to ensure they have a value
+			if inputSpec.Required && defaultValue == "" {
+				// Try to map to a GitHub environment variable
+				switch inputName {
+				case "token", "github-token":
+					if token, exists := config.Env["GITHUB_TOKEN"]; exists && token != "" {
+						defaultValue = token
+					}
+				case "repository":
+					if repo, exists := config.Env["GITHUB_REPOSITORY"]; exists && repo != "" {
+						defaultValue = repo
+					}
+				}
+			}
+
 			if defaultValue != "" {
 				expandedValue := expandEnvironmentVariables(defaultValue)
 				// Also process workflow templates for default values
 				expandedValue = substituteWorkflowTemplates(expandedValue, make(map[string]string), config.Env)
 				envName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
 				env = append(env, "-e", fmt.Sprintf("%s=%s", envName, expandedValue))
+				providedInputs[inputName] = true
 			}
 		}
 	}
 
-	// Build docker run command with both workspace and action mounted
+	// Generic GitHub environment variable mapping for action inputs
+	// If action requires an input that maps to a GITHUB_ environment variable, provide it automatically
+	for inputName := range meta.Inputs {
+		if !providedInputs[inputName] {
+			// Convert input name to potential GITHUB_ environment variable name
+			// Examples: "token" -> "GITHUB_TOKEN", "github-token" -> "GITHUB_TOKEN", "repository" -> "GITHUB_REPOSITORY"
+			var githubEnvName string
+
+			// Handle common mappings
+			switch inputName {
+			case "token", "github-token":
+				githubEnvName = "GITHUB_TOKEN"
+			case "repository":
+				githubEnvName = "GITHUB_REPOSITORY"
+			case "ref":
+				githubEnvName = "GITHUB_REF"
+			case "sha":
+				githubEnvName = "GITHUB_SHA"
+			case "workspace":
+				githubEnvName = "GITHUB_WORKSPACE"
+			case "actor":
+				githubEnvName = "GITHUB_ACTOR"
+			default:
+				// For other inputs, try mapping directly
+				// Convert input-name to GITHUB_INPUT_NAME format
+				candidate := fmt.Sprintf("GITHUB_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
+				// Only use if it exists in our config
+				if _, exists := config.Env[candidate]; exists {
+					githubEnvName = candidate
+				}
+			}
+
+			// If we found a mapping and the environment variable exists, use it
+			if githubEnvName != "" {
+				if githubValue, exists := config.Env[githubEnvName]; exists && githubValue != "" {
+					// Check if this input wasn't already processed (avoid duplicates)
+					inputEnvName := fmt.Sprintf("INPUT_%s", strings.ToUpper(strings.ReplaceAll(inputName, "-", "_")))
+					alreadySet := false
+					for i := 0; i < len(env); i += 2 {
+						if env[i] == "-e" && i+1 < len(env) && strings.HasPrefix(env[i+1], inputEnvName+"=") {
+							alreadySet = true
+							break
+						}
+					}
+
+					if !alreadySet {
+						env = append(env, "-e", fmt.Sprintf("%s=%s", inputEnvName, githubValue))
+					}
+				}
+			}
+		}
+	}
+
 	args := []string{
 		"run", "--rm",
 		"--network", "host", // Enable network access for GitHub operations
