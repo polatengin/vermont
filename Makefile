@@ -25,7 +25,7 @@ build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/vermont .
 
 # Clean build artifacts
-clean:
+clean: uninstall
 	@echo "Cleaning..."
 	rm -rf $(BIN_DIR)
 	go clean -cache
